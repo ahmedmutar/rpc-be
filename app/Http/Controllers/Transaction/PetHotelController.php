@@ -24,6 +24,7 @@ use Validator;
 use DB;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Carbon\Carbon;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class PetHotelController extends Controller
 {
@@ -2090,5 +2091,74 @@ class PetHotelController extends Controller
             DB::rollback();
             return responseInvalid([$th->getMessage()]);
         }
+    }
+
+    public function printInvoce(Request $request)
+    {
+        $trans = TransactionPetHotel::find($request->transactionId);
+
+        if (!$trans) {
+            return responseInvalid(['Transaction not found!']);
+        }
+
+        $locations = DB::table('location')
+            ->leftJoin('location_telephone', 'location.codeLocation', '=', 'location_telephone.codeLocation')
+            ->where(function ($query) {
+                $query->where('location_telephone.usage', 'Utama')
+                    ->orWhereNull('location_telephone.usage');
+            })
+            ->select(
+                'location.locationName',
+                'location.description',
+                'location_telephone.phoneNumber',
+                'location.codeLocation'
+            )
+            ->distinct()
+            ->get();
+
+        $locationGroups = [];
+        foreach ($locations as $location) {
+            $key = $location->codeLocation;
+            if (!isset($locationGroups[$key])) {
+                $locationGroups[$key] = [
+                    'name'        => $location->locationName,
+                    'description' => $location->description,
+                    'phone'       => $location->phoneNumber ?? ''
+                ];
+            }
+        }
+        $formattedLocations = array_values($locationGroups);
+
+        $customer = DB::table('customer as c')
+            ->join('customerTelephones as ct', 'c.id', '=', 'ct.customerId')
+            ->where('c.id', '=', $trans->customerId)
+            ->select('c.firstName', 'ct.phoneNumber', 'c.memberNo')
+            ->first();
+
+        $details = $this->ensureIsArray($request->purchases);
+        $namaFile = str_replace('/', '_', $trans->nota_number ?? 'INV') . '.pdf';
+
+        $detail_total = $this->ensureIsArray($request->detail_total);
+
+        $data = [
+            'locations'      => $formattedLocations,
+            'nota_date'      => Carbon::parse($trans->created_at)->format('d/m/Y'),
+            'no_nota'        => $trans->nota_number ?? '___________',
+            'member_no'      => $customer->memberNo ?? '-',
+            'customer_name'  => $customer->firstName ?? '-',
+            'phone_number'   => $customer->phoneNumber ?? '-',
+            'arrival_time'   => Carbon::parse($trans->created_at)->format('H:i'),
+            'details'        => $details,
+            'total'          => $detail_total,
+            'deposit'        => '-',
+            'total_payment'  => $detail_total['total_payment'],
+            'total_discount'  => $detail_total['total_discount'],
+            'subtotal'  => $detail_total['subtotal'],
+        ];
+
+        $pdf = Pdf::loadView('invoice.invoice_pethotel', $data);
+        return $pdf->download($namaFile);
+
+        return view('transaction.pethotel.print_invoice_pethotel');
     }
 }
