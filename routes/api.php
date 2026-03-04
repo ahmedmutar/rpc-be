@@ -48,6 +48,8 @@ use App\Http\Controllers\Customer\TemplateCustomerController;
 use App\Http\Controllers\Transaction\TransPetClinicController;
 use App\Http\Controllers\AccessControl\AccessControlController;
 use App\Http\Controllers\Customer\DataStaticCustomerController;
+use App\Http\Controllers\Finance\ExpensesController;
+use App\Http\Controllers\Finance\FinanceDashboardController;
 use App\Http\Controllers\Product\StockOpnameController;
 use App\Http\Controllers\Staff\AccessControlSchedulesController;
 use App\Http\Controllers\Transaction\TransactionPetShopController;
@@ -55,7 +57,7 @@ use App\Http\Controllers\Report\SalesController as ReportSalesController;
 use App\Http\Controllers\Report\StaffController as ReportStaffController;
 use App\Http\Controllers\Report\ExpensesController as ReportExpensesController;
 use App\Http\Controllers\Promotion\{DataStaticController as PromotionDataStaticController, PartnerController, DiscountController as DiscountPromotionController, PromotionDashboardController};
-use App\Http\Controllers\Service\{ServiceController, DataStaticServiceController, TreatmentController, DiagnoseController, FrequencyController, TaskController, CategoryController as ServiceCategoryController, ServiceDashboardController};
+use App\Http\Controllers\Service\{ServiceController, DataStaticServiceController, TreatmentController, DiagnoseController, FrequencyController, TaskController, CategoryController as ServiceCategoryController, ContractTemplateController, ServiceDashboardController};
 use App\Http\Controllers\Staff\IdentityController;
 use App\Http\Controllers\Staff\OverWorkController;
 use App\Http\Controllers\Staff\RequireSalaryController;
@@ -75,7 +77,6 @@ Route::put('user/{user}/online', [ApiController::class, 'online']);
 Route::group(['middleware' => ['jwt.verify']], function () {
 
     //location
-
     Route::post('logout', [ApiController::class, 'logout']);
 
     Route::group(['prefix' => 'dashboard'], function () {
@@ -131,8 +132,6 @@ Route::group(['middleware' => ['jwt.verify']], function () {
         Route::get('/product/transfer', [LocationController::class, 'locationTransferProduct']);
         Route::get('/product/transfer/destination', [LocationController::class, 'locationDestination']);
     });
-
-
 
     Route::get('logout', [ApiController::class, 'logout']);
     Route::get('get_user', [ApiController::class, 'get_user']);
@@ -292,9 +291,6 @@ Route::group(['middleware' => ['jwt.verify']], function () {
         Route::get('/datastatic', [ProductController::class, 'indexDataStatic']);
         Route::delete('/datastatic', [ProductController::class, 'deleteDataStatic']);
     });
-
-    //MODULE CUSTOMER
-    //customer group
 
     Route::group(['prefix' => 'customer'], function () {
 
@@ -513,7 +509,6 @@ Route::group(['middleware' => ['jwt.verify']], function () {
         });
     });
 
-
     //Security Group
     Route::group(['prefix' => 'securitygroup'], function () {
 
@@ -524,7 +519,6 @@ Route::group(['middleware' => ['jwt.verify']], function () {
         Route::get('/users', [SecurityGroupController::class, 'dropdownUsersSecurityGroup']);
         Route::put('/', [SecurityGroupController::class, 'updateSecurityGroup']);
     });
-
 
     //Access Control
     Route::group(['prefix' => 'accesscontrol'], function () {
@@ -794,6 +788,28 @@ Route::group(['middleware' => ['jwt.verify']], function () {
 
         Route::group(['prefix' => 'task'], function () {
             Route::get('/', [TaskController::class, 'index']);
+        });
+
+        Route::group(['prefix' => 'contract'], function () {
+            Route::get('/', [ContractTemplateController::class, 'index']);
+            Route::post('/', [ContractTemplateController::class, 'create']);
+            Route::get('/detail', [ContractTemplateController::class, 'detail']);
+            Route::put('/', [ContractTemplateController::class, 'update']);
+            Route::delete('/', [ContractTemplateController::class, 'delete']);
+            Route::get('/export', [ContractTemplateController::class, 'export']);
+            Route::get('/list', [ContractTemplateController::class, 'getListContract']);
+        });
+    });
+
+    Route::group(['prefix' => 'finance'], function () {
+
+        Route::group(['prefix' => 'dashboard'], function () {
+            Route::get('/', [FinanceDashboardController::class, 'index']);
+        });
+
+        Route::group(['prefix' => 'expenses'], function () {
+            Route::get('/export', [ExpensesController::class, 'export']);
+            Route::get('/', [ExpensesController::class, 'index']);
         });
     });
 
