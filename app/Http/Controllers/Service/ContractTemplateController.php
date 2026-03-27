@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Service;
 
 use App\Http\Controllers\Controller;
+use App\Models\category_contact_templates;
+use App\Models\category_contract_templates;
 use App\Models\contract_template;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -14,74 +16,86 @@ class ContractTemplateController extends Controller
     {
 
         $itemPerPage = $request->rowPerPage;
+        $orderColumn = $request->orderColumn ?: 'ct.updated_at';
+        $orderValue = $request->orderValue ?: 'desc';
+        $page = $request->goToPage ?: 1;
 
-        $page = $request->goToPage;
-
-        $data = DB::table('contract_templates as ct')
+        $dataQuery = DB::table('contract_templates as ct')
             ->join('users as u', 'ct.userId', 'u.id')
-            ->join('serviceCategory as sc', 'ct.category_id', 'sc.id')
+            ->leftJoin('category_contract_templates as tcm', 'ct.id', 'tcm.contractTemplateId')
+            ->leftJoin('serviceCategory as sc', 'tcm.categoryId', 'sc.id')
             ->select(
                 'ct.id',
-                'ct.title as title',
-                'ct.category_id as categoryId',
-                'sc.categoryName',
+                'ct.title',
                 'ct.status',
                 'u.firstName as createdBy',
+                // Gunakan COALESCE agar jika tidak ada kategori, hasilnya string kosong bukan NULL
+                DB::raw("COALESCE(GROUP_CONCAT(DISTINCT sc.id), '') as categoryIds"),
+                DB::raw("COALESCE(GROUP_CONCAT(DISTINCT sc.categoryName SEPARATOR '|'), '') as categoryNames"),
                 DB::raw("DATE_FORMAT(ct.updated_at, '%d/%m/%Y') as createdAt")
             )
-            ->where('ct.isDeleted', '=', 0);
+            ->where('ct.isDeleted', '=', 0)
+            // Pastikan ct.updated_at masuk ke groupBy karena digunakan di select DATE_FORMAT
+            ->groupBy('ct.id', 'u.firstName', 'ct.title', 'ct.status', 'ct.updated_at');
 
+        // --- LOGIC SEARCH (Tetap Sama) ---
         if ($request->search) {
             $res = $this->Search($request);
             if ($res) {
-                $data = $data->where($res[0], 'like', '%' . $request->search . '%');
-
-                for ($i = 1; $i < count($res); $i++) {
-
-                    $data = $data->orWhere($res[$i], 'like', '%' . $request->search . '%');
-                }
+                $dataQuery->where(function ($query) use ($res, $request) {
+                    foreach ($res as $index => $column) {
+                        if ($index === 0) $query->where($column, 'like', '%' . $request->search . '%');
+                        else $query->orWhere($column, 'like', '%' . $request->search . '%');
+                    }
+                });
             } else {
-                $data = [];
-                return response()->json([
-                    'totalPagination' => 0,
-                    'data' => $data
-                ], 200);
+                return response()->json(['totalPagination' => 0, 'data' => []], 200);
             }
         }
 
-        if ($request->orderValue) {
-            if ($request->orderColumn == 'createdAt') {
-                $data = $data->orderBy('ct.updated_at', $request->orderValue);
-            } else {
-                $data = $data->orderBy($request->orderColumn, $request->orderValue);
-            }
-        } else {
-            $data = $data->orderBy('ct.updated_at', 'desc');
-        }
+        // --- LOGIC SORTING ---
+        $dataQuery->orderBy($orderColumn == 'createdAt' ? 'ct.updated_at' : $orderColumn, $orderValue);
 
+        // --- EKSEKUSI DATA ---
         if ($itemPerPage) {
-
             $offset = ($page - 1) * $itemPerPage;
 
-            $count_data = $data->count();
-            $count_result = $count_data - $offset;
+            // Gunakan get() dulu baru count() dari collection jika groupBy bermasalah pada count query builder
+            $allResults = $dataQuery->get();
+            $count_data = $allResults->count();
 
-            if ($count_result < 0) {
-                $data = $data->offset(0)->limit($itemPerPage)->get();
-            } else {
-                $data = $data->offset($offset)->limit($itemPerPage)->get();
-            }
+            $results = $allResults->slice($offset >= 0 ? $offset : 0, $itemPerPage);
 
-            $totalPaging = $count_data / $itemPerPage;
+            $transformedData = $results->map(function ($item) {
+                return $this->formatToArray($item);
+            })->values(); // Reset index array
 
             return response()->json([
-                'totalPagination' => ceil($totalPaging),
-                'data' => $data
+                'totalPagination' => ceil($count_data / $itemPerPage),
+                'data' => $transformedData
             ], 200);
         } else {
-            $data = $data->get();
-            return response()->json($data);
+            $results = $dataQuery->get();
+            $transformedData = $results->map(function ($item) {
+                return $this->formatToArray($item);
+            });
+            return response()->json($transformedData);
         }
+    }
+
+    private function formatToArray($item)
+    {
+        // Ubah categoryIds menjadi array of integers
+        $item->categoryIds = $item->categoryIds
+            ? array_map('intval', explode(',', $item->categoryIds))
+            : [];
+
+        // Ubah categoryNames menjadi array of strings
+        $item->categoryNames = $item->categoryNames
+            ? explode('|', $item->categoryNames)
+            : [];
+
+        return $item;
     }
 
     public function create(Request $request)
@@ -90,13 +104,21 @@ class ContractTemplateController extends Controller
 
         $data->title = $request->title;
         $data->raw_content = $request->raw_content;
-        $data->category_id = $request->category_id;
         $data->status = $request->status;
         $data->version = $request->version;
 
         $data->userId = auth()->user()->id;
 
         if ($data->save()) {
+
+            foreach ($request->categories as $value) {
+                $data_detail = new category_contract_templates();
+                $data_detail->categoryId = $value;
+                $data_detail->contractTemplateId = $data->id;
+                $data_detail->userId = auth()->user()->id;
+                $data_detail->save();
+            }
+
             return responseCreate();
         } else {
             return response()->json([

@@ -13,13 +13,11 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('contract_templates', function (Blueprint $table) {
+        Schema::create('category_contract_templates', function (Blueprint $table) {
             $table->id();
 
-            $table->string('title');
-            $table->mediumText('raw_content');
-            $table->string('status');
-            $table->string('version');
+            $table->integer('contractTemplateId')->unsigned();
+            $table->integer('categoryId')->unsigned();
 
             $table->boolean('isDeleted')->nullable()->default(false);
             $table->integer('userId');
@@ -37,6 +35,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('contract_templates');
+        Schema::dropIfExists('category_contract_templates');
     }
 };
