@@ -142,6 +142,31 @@ class ContractTemplateController extends Controller
         return $res;
     }
 
+    public function detail(Request $request)
+    {
+        $template = contract_template::where('id', $request->id)
+            ->where('isDeleted', 0)
+            ->select('id', 'title', 'raw_content', 'status', 'version')
+            ->first();
+
+        if (!$template) {
+            return response()->json([
+                'message' => 'Contract Template not found'
+            ], 404);
+        }
+
+        $categories = DB::table('category_contract_templates as tcm')
+            ->join('serviceCategory as sc', 'tcm.categoryId', 'sc.id')
+            ->where('tcm.contractTemplateId', $template->id)
+            ->where('tcm.isDeleted', 0)
+            ->select('sc.id', 'sc.categoryName')
+            ->get();
+
+        $template->categories = $categories;
+
+        return response()->json($template, 200);
+    }
+
     public function update(Request $request)
     {
         $data = contract_template::find($request->id);
