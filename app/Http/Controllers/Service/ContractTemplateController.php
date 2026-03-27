@@ -154,19 +154,64 @@ class ContractTemplateController extends Controller
 
         $data->title = $request->title;
         $data->raw_content = $request->raw_content;
-        $data->category_id = $request->category_id;
         $data->status = $request->status;
-        $data->version = $request->version;
+
+        // version from request or auto increment from current version
+        if ($request->filled('version')) {
+            $data->version = $request->version;
+        } else {
+            $data->version = $this->createNextVersion($data->version);
+        }
 
         $data->userUpdateId = auth()->user()->id;
 
+
         if ($data->save()) {
+            // update category relations when categories sent
+            if (is_array($request->categories)) {
+                // soft delete old relations
+                category_contract_templates::where('contractTemplateId', $data->id)
+                    ->update(['isDeleted' => true, 'userUpdateId' => auth()->user()->id]);
+
+                // create new relations
+                foreach ($request->categories as $value) {
+                    $data_detail = new category_contract_templates();
+                    $data_detail->categoryId = $value;
+                    $data_detail->contractTemplateId = $data->id;
+                    $data_detail->userId = auth()->user()->id;
+                    $data_detail->save();
+                }
+            }
+
             return responseUpdate();
         } else {
             return response()->json([
                 'message' => 'Failed to update Contract Template'
             ], 500);
         }
+    }
+
+    private function createNextVersion($currentVersion)
+    {
+        if (!$currentVersion) {
+            return '1.0';
+        }
+
+        // numeric version like 1, 2
+        if (is_numeric($currentVersion)) {
+            return (string) (((int) $currentVersion) + 1);
+        }
+
+        // dotted version like 1.0, 1.2.3
+        if (preg_match('/^([0-9]+(\.[0-9]+)*)$/', $currentVersion)) {
+            $parts = explode('.', $currentVersion);
+            $last = (int) array_pop($parts);
+            $last++;
+            $parts[] = (string) $last;
+            return implode('.', $parts);
+        }
+
+        return $currentVersion;
     }
 
     public function delete(Request $request)
