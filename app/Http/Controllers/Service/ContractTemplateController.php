@@ -37,7 +37,7 @@ class ContractTemplateController extends Controller
             )
             ->where('ct.isDeleted', '=', 0)
             // Pastikan ct.updated_at masuk ke groupBy karena digunakan di select DATE_FORMAT
-            ->groupBy('ct.id', 'u.firstName', 'ct.title', 'ct.status', 'ct.updated_at');
+            ->groupBy('ct.id', 'u.firstName', 'ct.title', 'ct.status','ct.version', 'ct.updated_at');
 
         // --- LOGIC SEARCH (Tetap Sama) ---
         if ($request->search) {
