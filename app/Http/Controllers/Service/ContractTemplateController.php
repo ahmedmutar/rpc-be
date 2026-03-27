@@ -28,6 +28,7 @@ class ContractTemplateController extends Controller
                 'ct.id',
                 'ct.title',
                 'ct.status',
+                'ct.version',
                 'u.firstName as createdBy',
                 // Gunakan COALESCE agar jika tidak ada kategori, hasilnya string kosong bukan NULL
                 DB::raw("COALESCE(GROUP_CONCAT(DISTINCT sc.id), '') as categoryIds"),
