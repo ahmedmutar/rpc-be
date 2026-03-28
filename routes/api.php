@@ -714,6 +714,16 @@ Route::group(['middleware' => ['jwt.verify']], function () {
             Route::post('/reassign', [PetSalonController::class, 'reassignDoctor']);
 
             Route::post('/petcheck', [PetSalonController::class, 'createPetCheck']);
+
+            Route::post('/treatment', [PetSalonController::class, 'Treatment']);
+
+            Route::get('/beforepayment', [PetSalonController::class, 'showDataBeforePayment']);
+            Route::post('/checkpromo', [PetSalonController::class, 'checkPromo']);
+
+            Route::post('/discount', [PetSalonController::class, 'transactionDiscount']);
+            Route::post('/payment', [PetSalonController::class, 'payment']);
+
+            Route::get('/invoice', [PetSalonController::class, 'printInvoce']);
         });
 
         Route::get('/materialdata', [MaterialDataController::class, 'index']);
