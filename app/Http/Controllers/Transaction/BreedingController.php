@@ -2066,7 +2066,7 @@ class BreedingController extends Controller
 
             $nomorUrut = str_pad($jumlahTransaksi + 1, 4, '0', STR_PAD_LEFT);
 
-            $notaNumber = "INV/PH/{$locationId}/{$tahun}/{$bulan}/{$nomorUrut}";
+            $notaNumber = "INV/BR/{$locationId}/{$tahun}/{$bulan}/{$nomorUrut}";
             $total->nota_number = $notaNumber;
 
             $total->userId = $request->user()->id;
