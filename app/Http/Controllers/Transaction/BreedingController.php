@@ -2077,6 +2077,8 @@ class BreedingController extends Controller
             statusTransactionBreeding($request->transactionId, 'Menunggu konfirmasi pembayaran', $request->user()->id);
             DB::commit();
 
+            updateLastTransaction($trans->customerId);
+
             return responseCreate();
         } catch (\Throwable $th) {
             DB::rollback();

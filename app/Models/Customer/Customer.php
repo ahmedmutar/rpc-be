@@ -38,6 +38,7 @@ class Customer extends Model
         'referenceCustomerId',
         'isReminderBooking',
         'isReminderPayment',
+        'lastTransaction',
         'isDeleted',
         'deletedBy',
         'deletedAt',

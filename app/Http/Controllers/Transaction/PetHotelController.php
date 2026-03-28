@@ -2086,6 +2086,8 @@ class PetHotelController extends Controller
             statusTransactionPetHotel($request->transactionId, 'Menunggu konfirmasi pembayaran', $request->user()->id);
             DB::commit();
 
+            updateLastTransaction($trans->customerId);
+
             return responseCreate();
         } catch (\Throwable $th) {
             DB::rollback();

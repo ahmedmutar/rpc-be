@@ -6,6 +6,7 @@
  * @return response()
  */
 
+use App\Models\Customer\Customer;
 use App\Models\ProductLog;
 use App\Models\Transaction;
 use App\Models\ProductSellLog;
@@ -23,6 +24,7 @@ use App\Models\TransactionPetHotelLog;
 use App\Models\TransactionPetClinicLog;
 use App\Models\transactionpetsalon;
 use App\Models\transactionPetSalonLog;
+use Carbon\Carbon;
 
 if (!function_exists('adminAccess')) {
     function adminAccess($id)
@@ -305,6 +307,17 @@ if (!function_exists('statusTransactionPetClinic')) {
                     'status' => $status,
                 ]);
         }
+    }
+}
+
+if (!function_exists('updateLastTransaction')) {
+    function updateLastTransaction($customerId)
+    {
+        Customer::where('id', '=', $customerId)
+            ->update([
+                'lastTransaction' => Carbon::now(),
+            ]);
+        return;
     }
 }
 

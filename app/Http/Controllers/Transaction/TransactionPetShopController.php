@@ -464,6 +464,8 @@ class TransactionPetShopController
                 ]);
             transactionPetshopLog($tran->id, 'New Transaction', '', $request->user()->id);
 
+            updateLastTransaction($cust);
+
             DB::commit();
 
             return response()->json([
