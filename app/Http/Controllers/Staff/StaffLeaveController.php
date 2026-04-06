@@ -100,7 +100,10 @@ class StaffLeaveController extends Controller
 
 
             $listOrder = array(
-                1, 2, 3, 4
+                1,
+                2,
+                3,
+                4
             );
 
             if (!in_array($request->balanceTypeId, $listOrder)) {
@@ -1394,225 +1397,225 @@ class StaffLeaveController extends Controller
     }
 
 
-    public function indexLeaveAdminandOffice(Request $request)
-    {
+    // public function indexLeaveAdminandOffice(Request $request)
+    // {
 
-        if (strtolower($request->status) == "pending") {
+    //     if (strtolower($request->status) == "pending") {
 
-            $data = LeaveRequest::from('leaveRequest as a')
-                ->leftjoin('jobTitle as b', 'a.jobTitle', '=', 'b.id')
-                ->select(
-                    'a.id as leaveRequestId',
-                    'a.requesterName as requesterName',
-                    'b.jobName as jobName',
-                    'a.locationName as locationName',
-                    'a.locationId as locationId',
-                    'a.leaveType as leaveType',
-                    DB::raw("IFNULL(DATE_FORMAT(a.fromDate, '%d/%m/%Y %H:%i:%s'),'') as fromDate"),
-                    'a.duration as duration',
-                    'a.remark as remark',
-                    DB::raw("IFNULL(DATE_FORMAT(a.created_at, '%d/%m/%Y %H:%i:%s'),'') as createdAt"),
-                    'a.updated_at as updatedAt',
-                )
-                ->where([
-                    ['a.status', '=', $request->status],
-                ]);
-        } elseif (strtolower($request->status) == "approve") {
+    //         $data = LeaveRequest::from('leaveRequest as a')
+    //             ->leftjoin('jobTitle as b', 'a.jobTitle', '=', 'b.id')
+    //             ->select(
+    //                 'a.id as leaveRequestId',
+    //                 'a.requesterName as requesterName',
+    //                 'b.jobName as jobName',
+    //                 'a.locationName as locationName',
+    //                 'a.locationId as locationId',
+    //                 'a.leaveType as leaveType',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.fromDate, '%d/%m/%Y %H:%i:%s'),'') as fromDate"),
+    //                 'a.duration as duration',
+    //                 'a.remark as remark',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.created_at, '%d/%m/%Y %H:%i:%s'),'') as createdAt"),
+    //                 'a.updated_at as updatedAt',
+    //             )
+    //             ->where([
+    //                 ['a.status', '=', $request->status],
+    //             ]);
+    //     } elseif (strtolower($request->status) == "approve") {
 
-            $data = LeaveRequest::from('leaveRequest as a')
-                ->leftjoin('jobTitle as b', 'a.jobTitle', '=', 'b.id')
-                ->select(
-                    'a.id as leaveRequestId',
-                    'a.requesterName as requesterName',
-                    'b.jobName as jobName',
-                    'a.locationName as locationName',
-                    'a.locationId as locationId',
-                    'a.leaveType as leaveType',
-                    DB::raw("IFNULL(DATE_FORMAT(a.fromDate, '%d/%m/%Y %H:%i:%s'),'') as fromDate"),
-                    'a.duration as duration',
-                    'a.remark as remark',
-                    DB::raw("IFNULL(DATE_FORMAT(a.created_at, '%d/%m/%Y %H:%i:%s'),'') as createdAt"),
-                    'a.approveOrRejectedBy as  approvedBy',
-                    DB::raw("IFNULL(DATE_FORMAT(a.approveOrRejectedDate, '%d/%m/%Y %H:%i:%s'),'') as approvedAt"),
-                    'a.updated_at as updatedAt',
-                )->where([
-                    ['a.status', '=', $request->status],
-                ]);
-        } else {
+    //         $data = LeaveRequest::from('leaveRequest as a')
+    //             ->leftjoin('jobTitle as b', 'a.jobTitle', '=', 'b.id')
+    //             ->select(
+    //                 'a.id as leaveRequestId',
+    //                 'a.requesterName as requesterName',
+    //                 'b.jobName as jobName',
+    //                 'a.locationName as locationName',
+    //                 'a.locationId as locationId',
+    //                 'a.leaveType as leaveType',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.fromDate, '%d/%m/%Y %H:%i:%s'),'') as fromDate"),
+    //                 'a.duration as duration',
+    //                 'a.remark as remark',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.created_at, '%d/%m/%Y %H:%i:%s'),'') as createdAt"),
+    //                 'a.approveOrRejectedBy as  approvedBy',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.approveOrRejectedDate, '%d/%m/%Y %H:%i:%s'),'') as approvedAt"),
+    //                 'a.updated_at as updatedAt',
+    //             )->where([
+    //                 ['a.status', '=', $request->status],
+    //             ]);
+    //     } else {
 
-            $data = LeaveRequest::from('leaveRequest as a')
-                ->leftjoin('jobTitle as b', 'a.jobTitle', '=', 'b.id')
-                ->select(
-                    'a.id as leaveRequestId',
-                    'a.requesterName as requesterName',
-                    'b.jobName as jobName',
-                    'a.locationName as locationName',
-                    'a.locationId as locationId',
-                    'a.leaveType as leaveType',
-                    DB::raw("IFNULL(DATE_FORMAT(a.fromDate, '%d/%m/%Y %H:%i:%s'),'') as fromDate"),
-                    'a.duration as duration',
-                    'a.remark as remark',
-                    DB::raw("IFNULL(DATE_FORMAT(a.created_at, '%d/%m/%Y %H:%i:%s'),'') as createdAt"),
-                    'a.approveOrRejectedBy as  rejectedBy',
-                    'a.rejectedReason as  rejectedReason',
-                    DB::raw("IFNULL(DATE_FORMAT(a.approveOrRejectedDate, '%d/%m/%Y %H:%i:%s'),'') as rejectedAt"),
-                    'a.updated_at as updatedAt',
-                )
-                ->where([
-                    ['a.status', '=', $request->status],
-                ]);
-        }
+    //         $data = LeaveRequest::from('leaveRequest as a')
+    //             ->leftjoin('jobTitle as b', 'a.jobTitle', '=', 'b.id')
+    //             ->select(
+    //                 'a.id as leaveRequestId',
+    //                 'a.requesterName as requesterName',
+    //                 'b.jobName as jobName',
+    //                 'a.locationName as locationName',
+    //                 'a.locationId as locationId',
+    //                 'a.leaveType as leaveType',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.fromDate, '%d/%m/%Y %H:%i:%s'),'') as fromDate"),
+    //                 'a.duration as duration',
+    //                 'a.remark as remark',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.created_at, '%d/%m/%Y %H:%i:%s'),'') as createdAt"),
+    //                 'a.approveOrRejectedBy as  rejectedBy',
+    //                 'a.rejectedReason as  rejectedReason',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.approveOrRejectedDate, '%d/%m/%Y %H:%i:%s'),'') as rejectedAt"),
+    //                 'a.updated_at as updatedAt',
+    //             )
+    //             ->where([
+    //                 ['a.status', '=', $request->status],
+    //             ]);
+    //     }
 
-        if ($request->locationId) {
+    //     if ($request->locationId) {
 
-            $test = $request->locationId;
+    //         $test = $request->locationId;
 
-            $data = $data->where(function ($query) use ($test) {
-                foreach ($test as $id) {
-                    $query->orWhereRaw("FIND_IN_SET(?, a.locationId)", [$id]);
-                }
-            });
-        }
+    //         $data = $data->where(function ($query) use ($test) {
+    //             foreach ($test as $id) {
+    //                 $query->orWhereRaw("FIND_IN_SET(?, a.locationId)", [$id]);
+    //             }
+    //         });
+    //     }
 
-        if (strtotime($request->fromDate) !== false && strtotime($request->toDate) !== false) {
+    //     if (strtotime($request->fromDate) !== false && strtotime($request->toDate) !== false) {
 
-            $start = Carbon::parse($request->fromDate);
-            $end = Carbon::parse($request->toDate);
+    //         $start = Carbon::parse($request->fromDate);
+    //         $end = Carbon::parse($request->toDate);
 
-            if ($end < $start) {
-                return response()->json([
-                    'message' => 'The given data was invalid.',
-                    'errors' => ['To date must higher than from date!!'],
-                ], 422);
-            }
+    //         if ($end < $start) {
+    //             return response()->json([
+    //                 'message' => 'The given data was invalid.',
+    //                 'errors' => ['To date must higher than from date!!'],
+    //             ], 422);
+    //         }
 
-            $data = $data->whereBetween('fromDate', [$request->fromDate, $request->toDate]);
-        }
-
-
-        if ($request->search) {
-
-            $res = $this->SearchRequestLeaveAdminOffice($request);
-
-            if ($res) {
-
-                if (is_numeric($request->search)) {
-                    $data = $data->where($res, '=', $request->search);
-                } else {
-                    $data = $data->where($res, 'like', '%' . $request->search . '%');
-                }
-            } else {
-                return null;
-            }
-        }
-
-        return $data;
-    }
-
-    public function indexLeaveDoctorandStaff(Request $request)
-    {
-
-        if (strtolower($request->status) == "pending") {
-
-            $data = LeaveRequest::from('leaveRequest as a')
-                ->leftjoin('jobTitle as b', 'a.jobTitle', '=', 'b.id')
-                ->select(
-                    'a.id as leaveRequestId',
-                    'a.requesterName as requesterName',
-                    'b.jobName as jobName',
-                    'a.locationName as locationName',
-                    'a.locationId as locationId',
-                    'a.leaveType as leaveType',
-                    DB::raw("IFNULL(DATE_FORMAT(a.fromDate, '%d/%m/%Y %H:%i:%s'),'') as fromDate"),
-                    'a.duration as duration',
-                    'a.remark as remark',
-                    DB::raw("IFNULL(DATE_FORMAT(a.created_at, '%d/%m/%Y %H:%i:%s'),'') as createdAt"),
-                    'a.updated_at as updatedAt',
-                )
-                ->where([
-                    ['a.status', '=', $request->status],
-                    ['a.usersId', '=', $request->user()->id],
-                ]);
-        } elseif (strtolower($request->status) == "approve") {
-
-            $data = LeaveRequest::from('leaveRequest as a')
-                ->leftjoin('jobTitle as b', 'a.jobTitle', '=', 'b.id')
-                ->select(
-                    'a.id as leaveRequestId',
-                    'a.requesterName as requesterName',
-                    'b.jobName as jobName',
-                    'a.locationName as locationName',
-                    'a.locationId as locationId',
-                    'a.leaveType as leaveType',
-                    DB::raw("IFNULL(DATE_FORMAT(a.fromDate, '%d/%m/%Y %H:%i:%s'),'') as fromDate"),
-                    'a.duration as duration',
-                    'a.remark as remark',
-                    DB::raw("IFNULL(DATE_FORMAT(a.created_at, '%d/%m/%Y %H:%i:%s'),'') as createdAt"),
-                    'a.approveOrRejectedBy as  approvedBy',
-                    DB::raw("IFNULL(DATE_FORMAT(a.approveOrRejectedDate, '%d/%m/%Y %H:%i:%s'),'') as approvedAt"),
-                    'a.updated_at as updatedAt',
-                )->where([
-                    ['a.status', '=', $request->status],
-                    ['a.usersId', '=', $request->user()->id],
-                ]);
-        } else {
-
-            $data = LeaveRequest::from('leaveRequest as a')
-                ->leftjoin('jobTitle as b', 'a.jobTitle', '=', 'b.id')
-                ->select(
-                    'a.id as leaveRequestId',
-                    'a.requesterName as requesterName',
-                    'b.jobName as jobName',
-                    'a.locationName as locationName',
-                    'a.locationId as locationId',
-                    'a.leaveType as leaveType',
-                    DB::raw("IFNULL(DATE_FORMAT(a.fromDate, '%d/%m/%Y %H:%i:%s'),'') as fromDate"),
-                    'a.duration as duration',
-                    'a.remark as remark',
-                    DB::raw("IFNULL(DATE_FORMAT(a.created_at, '%d/%m/%Y %H:%i:%s'),'') as createdAt"),
-                    'a.approveOrRejectedBy as  rejectedBy',
-                    'a.rejectedReason as  rejectedReason',
-                    DB::raw("IFNULL(DATE_FORMAT(a.approveOrRejectedDate, '%d/%m/%Y %H:%i:%s'),'') as rejectedAt"),
-                    'a.updated_at as updatedAt',
-                )
-                ->where([
-                    ['a.status', '=', $request->status],
-                    ['a.usersId', '=', $request->user()->id],
-                ]);
-        }
+    //         $data = $data->whereBetween('fromDate', [$request->fromDate, $request->toDate]);
+    //     }
 
 
-        if (strtotime($request->fromDate) !== false && strtotime($request->toDate) !== false) {
+    //     if ($request->search) {
 
-            $start = Carbon::parse($request->fromDate);
-            $end = Carbon::parse($request->toDate);
+    //         $res = $this->SearchRequestLeaveAdminOffice($request);
 
-            if ($end < $start) {
+    //         if ($res) {
 
-                return responseInvalid(['To date must higher than from date!!']);
-            }
+    //             if (is_numeric($request->search)) {
+    //                 $data = $data->where($res, '=', $request->search);
+    //             } else {
+    //                 $data = $data->where($res, 'like', '%' . $request->search . '%');
+    //             }
+    //         } else {
+    //             return null;
+    //         }
+    //     }
 
-            $data = $data->whereBetween('fromDate', [$request->fromDate, $request->toDate]);
-        }
+    //     return $data;
+    // }
 
-        if ($request->search) {
+    // public function indexLeaveDoctorandStaff(Request $request)
+    // {
 
-            $res = $this->SearchRequestLeaveStaffDoctor($request);
+    //     if (strtolower($request->status) == "pending") {
 
-            if ($res) {
+    //         $data = LeaveRequest::from('leaveRequest as a')
+    //             ->leftjoin('jobTitle as b', 'a.jobTitle', '=', 'b.id')
+    //             ->select(
+    //                 'a.id as leaveRequestId',
+    //                 'a.requesterName as requesterName',
+    //                 'b.jobName as jobName',
+    //                 'a.locationName as locationName',
+    //                 'a.locationId as locationId',
+    //                 'a.leaveType as leaveType',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.fromDate, '%d/%m/%Y %H:%i:%s'),'') as fromDate"),
+    //                 'a.duration as duration',
+    //                 'a.remark as remark',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.created_at, '%d/%m/%Y %H:%i:%s'),'') as createdAt"),
+    //                 'a.updated_at as updatedAt',
+    //             )
+    //             ->where([
+    //                 ['a.status', '=', $request->status],
+    //                 ['a.usersId', '=', $request->user()->id],
+    //             ]);
+    //     } elseif (strtolower($request->status) == "approve") {
 
-                if (is_numeric($request->search)) {
-                    $data = $data->where($res, '=', $request->search);
-                } else {
-                    $data = $data->where($res, 'like', '%' . $request->search . '%');
-                }
-            } else {
-                return null;
-            }
-        }
+    //         $data = LeaveRequest::from('leaveRequest as a')
+    //             ->leftjoin('jobTitle as b', 'a.jobTitle', '=', 'b.id')
+    //             ->select(
+    //                 'a.id as leaveRequestId',
+    //                 'a.requesterName as requesterName',
+    //                 'b.jobName as jobName',
+    //                 'a.locationName as locationName',
+    //                 'a.locationId as locationId',
+    //                 'a.leaveType as leaveType',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.fromDate, '%d/%m/%Y %H:%i:%s'),'') as fromDate"),
+    //                 'a.duration as duration',
+    //                 'a.remark as remark',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.created_at, '%d/%m/%Y %H:%i:%s'),'') as createdAt"),
+    //                 'a.approveOrRejectedBy as  approvedBy',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.approveOrRejectedDate, '%d/%m/%Y %H:%i:%s'),'') as approvedAt"),
+    //                 'a.updated_at as updatedAt',
+    //             )->where([
+    //                 ['a.status', '=', $request->status],
+    //                 ['a.usersId', '=', $request->user()->id],
+    //             ]);
+    //     } else {
 
-        return $data;
-    }
+    //         $data = LeaveRequest::from('leaveRequest as a')
+    //             ->leftjoin('jobTitle as b', 'a.jobTitle', '=', 'b.id')
+    //             ->select(
+    //                 'a.id as leaveRequestId',
+    //                 'a.requesterName as requesterName',
+    //                 'b.jobName as jobName',
+    //                 'a.locationName as locationName',
+    //                 'a.locationId as locationId',
+    //                 'a.leaveType as leaveType',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.fromDate, '%d/%m/%Y %H:%i:%s'),'') as fromDate"),
+    //                 'a.duration as duration',
+    //                 'a.remark as remark',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.created_at, '%d/%m/%Y %H:%i:%s'),'') as createdAt"),
+    //                 'a.approveOrRejectedBy as  rejectedBy',
+    //                 'a.rejectedReason as  rejectedReason',
+    //                 DB::raw("IFNULL(DATE_FORMAT(a.approveOrRejectedDate, '%d/%m/%Y %H:%i:%s'),'') as rejectedAt"),
+    //                 'a.updated_at as updatedAt',
+    //             )
+    //             ->where([
+    //                 ['a.status', '=', $request->status],
+    //                 ['a.usersId', '=', $request->user()->id],
+    //             ]);
+    //     }
+
+
+    //     if (strtotime($request->fromDate) !== false && strtotime($request->toDate) !== false) {
+
+    //         $start = Carbon::parse($request->fromDate);
+    //         $end = Carbon::parse($request->toDate);
+
+    //         if ($end < $start) {
+
+    //             return responseInvalid(['To date must higher than from date!!']);
+    //         }
+
+    //         $data = $data->whereBetween('fromDate', [$request->fromDate, $request->toDate]);
+    //     }
+
+    //     if ($request->search) {
+
+    //         $res = $this->SearchRequestLeaveStaffDoctor($request);
+
+    //         if ($res) {
+
+    //             if (is_numeric($request->search)) {
+    //                 $data = $data->where($res, '=', $request->search);
+    //             } else {
+    //                 $data = $data->where($res, 'like', '%' . $request->search . '%');
+    //             }
+    //         } else {
+    //             return null;
+    //         }
+    //     }
+
+    //     return $data;
+    // }
 
 
     public function approveAll(Request $request)
@@ -1780,123 +1783,213 @@ class StaffLeaveController extends Controller
     }
 
 
+    private const STATUS_COLUMNS = [
+        'pending' => [
+            'select'  => ['leaveRequestId', 'requesterName', 'jobName', 'locationName', 'leaveType', 'fromDate', 'duration', 'remark', 'createdAt'],
+            'order'   => ['requesterName', 'jobName', 'locationName', 'leaveType', 'fromDate', 'duration', 'remark', 'createdAt'],
+            'extra'   => [],
+        ],
+        'approve' => [
+            'select'  => ['leaveRequestId', 'requesterName', 'jobName', 'locationName', 'leaveType', 'fromDate', 'duration', 'remark', 'createdAt', 'approvedBy', 'approvedAt'],
+            'order'   => ['requesterName', 'jobName', 'locationName', 'leaveType', 'fromDate', 'duration', 'remark', 'createdAt', 'approvedBy', 'approvedAt'],
+            'extra'   => [
+                'a.approveOrRejectedBy as approvedBy',
+                "IFNULL(DATE_FORMAT(a.approveOrRejectedDate, '%d/%m/%Y %H:%i:%s'),'') as approvedAt",
+            ],
+        ],
+        'reject' => [
+            'select'  => ['leaveRequestId', 'requesterName', 'jobName', 'locationName', 'leaveType', 'fromDate', 'duration', 'remark', 'createdAt', 'rejectedBy', 'rejectedReason', 'rejectedAt'],
+            'order'   => ['requesterName', 'jobName', 'locationName', 'leaveType', 'fromDate', 'duration', 'remark', 'createdAt', 'rejectedBy', 'rejectedReason', 'rejectedAt'],
+            'extra'   => [
+                'a.approveOrRejectedBy as rejectedBy',
+                'a.rejectedReason as rejectedReason',
+                "IFNULL(DATE_FORMAT(a.approveOrRejectedDate, '%d/%m/%Y %H:%i:%s'),'') as rejectedAt",
+            ],
+        ],
+    ];
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Base select columns shared by all statuses
+    // ─────────────────────────────────────────────────────────────────────────────
+    private const BASE_COLUMNS = [
+        'a.id as leaveRequestId',
+        'a.requesterName as requesterName',
+        'b.jobName as jobName',
+        'a.locationName as locationName',
+        'a.locationId as locationId',
+        'a.leaveType as leaveType',
+        "IFNULL(DATE_FORMAT(a.fromDate, '%d/%m/%Y %H:%i:%s'),'') as fromDate",
+        'a.duration as duration',
+        'a.remark as remark',
+        "IFNULL(DATE_FORMAT(a.created_at, '%d/%m/%Y %H:%i:%s'),'') as createdAt",
+        'a.updated_at as updatedAt',
+    ];
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // GET /index-request-leave
+    // ─────────────────────────────────────────────────────────────────────────────
     public function getIndexRequestLeave(Request $request)
     {
-
-
         $defaultRowPerPage = 5;
-        $defaultOrderBy = "asc";
+        $defaultOrderBy    = 'asc';
 
-        $rolesIndex = roleStaffLeave($request->user()->id);
-
-        $validate = Validator::make($request->all(), [
-            'status' => 'required',
-        ]);
+        $validate = Validator::make($request->all(), ['status' => 'required']);
 
         if ($validate->fails()) {
+            return responseInvalid($validate->errors()->all());
+        }
 
-            $errors = $validate->errors()->all();
+        $status = strtolower($request->status);
 
-            return responseInvalid($errors);
-        } else {
+        if (!array_key_exists($status, self::STATUS_COLUMNS)) {
+            return responseInvalid(['Value status must be Pending, Approve or Reject']);
+        }
 
-            if (strtolower($request->status) != "approve" && strtolower($request->status) != "reject" && strtolower($request->status) != "pending") {
+        $rolesIndex = roleStaffLeave($request->user()->id);
+        $data       = $rolesIndex == 1
+            ? $this->indexLeaveAdminandOffice($request)
+            : $this->indexLeaveDoctorandStaff($request);
 
-                return responseInvalid(['Value status must Pending, Approve or Reject']);
-            } else {
+        if ($data === null) {
+            return response()->json(['totalPagination' => 0, 'data' => []], 200);
+        }
 
-                $listOrder = [];
+        $statusConfig = self::STATUS_COLUMNS[$status];
 
-                if ($rolesIndex == 1) {
+        // ── Validate order column if provided ────────────────────────────────────
+        if ($request->orderColumn) {
 
-                    $data = $this->indexLeaveAdminandOffice($request);
-                } else {
+            if (!in_array($request->orderColumn, $statusConfig['order'])) {
+                return response()->json([
+                    'message'     => 'failed',
+                    'errors'      => 'Please try different order column',
+                    'orderColumn' => $statusConfig['order'],
+                ]);
+            }
 
-                    $data = $this->indexLeaveDoctorandStaff($request);
-                }
+            $defaultOrderBy = strtolower($request->orderValue ?? 'asc');
 
-
-                if ($data == null) {
-                    return response()->json(['totalPagination' => 0, 'data' => []], 200);
-                }
-
-
-                if ($request->orderValue) {
-
-                    $defaultOrderBy = $request->orderValue;
-                }
-
-                $checkOrder = null;
-
-                if ($request->orderColumn && $defaultOrderBy) {
-
-                    if (strtolower($request->status) == "pending") {
-                        $listOrder = array('requesterName', 'jobName', 'locationName', 'leaveType', 'fromDate', 'duration', 'remark', 'createdAt');
-                    } elseif (strtolower($request->status) == "approve") {
-                        $listOrder = array('requesterName', 'jobName', 'locationName', 'leaveType', 'fromDate', 'duration', 'remark', 'createdAt', 'approvedBy', 'approvedAt');
-                    } else {
-                        $listOrder = array('requesterName', 'jobName', 'locationName', 'leaveType', 'fromDate', 'duration', 'remark', 'createdAt', 'rejectedBy', 'rejectedReason', 'rejectedAt');
-                    }
-
-                    if (!in_array($request->orderColumn, $listOrder)) {
-
-                        return response()->json([
-                            'message' => 'failed',
-                            'errors' => 'Please try different order column',
-                            'orderColumn' => $listOrder,
-                        ]);
-                    }
-
-                    if (strtolower($defaultOrderBy) != "asc" && strtolower($defaultOrderBy) != "desc") {
-
-                        return responseInvalid(['order value must Ascending: ASC or Descending: DESC ']);
-                    }
-
-                    $checkOrder = true;
-                }
-
-                if ($checkOrder) {
-
-                    if (strtolower($request->status) == "pending") {
-                        $data = DB::table($data)->select('leaveRequestId', 'requesterName', 'jobName', 'locationName', 'leaveType', 'fromDate', 'duration', 'remark', 'createdAt')->orderBy($request->orderColumn, $defaultOrderBy)->orderBy('updatedAt', 'desc');
-                    } elseif (strtolower($request->status) == "approve") {
-                        $data = DB::table($data)->select('leaveRequestId', 'requesterName', 'jobName', 'locationName', 'leaveType', 'fromDate', 'duration', 'remark', 'createdAt', 'approvedBy', 'approvedAt')->orderBy($request->orderColumn, $defaultOrderBy)->orderBy('updatedAt', 'desc');
-                    } else {
-                        $data = DB::table($data)->select('leaveRequestId', 'requesterName', 'jobName', 'locationName', 'leaveType', 'fromDate', 'duration', 'remark', 'createdAt', 'rejectedBy', 'rejectedReason', 'rejectedAt')->orderBy($request->orderColumn, $defaultOrderBy)->orderBy('updatedAt', 'desc');
-                    }
-                } else {
-
-                    if (strtolower($request->status) == "pending") {
-                        $data = DB::table($data)->select('leaveRequestId', 'requesterName', 'jobName', 'locationName', 'leaveType', 'fromDate', 'duration', 'remark', 'createdAt')->orderBy('updatedAt', 'desc');
-                    } elseif (strtolower($request->status) == "approve") {
-                        $data = DB::table($data)->select('leaveRequestId', 'requesterName', 'jobName', 'locationName', 'leaveType', 'fromDate', 'duration', 'remark', 'createdAt', 'approvedBy', 'approvedAt')->orderBy('updatedAt', 'desc');
-                    } else {
-                        $data = DB::table($data)->select('leaveRequestId', 'requesterName', 'jobName', 'locationName', 'leaveType', 'fromDate', 'duration', 'remark', 'createdAt', 'rejectedBy', 'rejectedReason', 'rejectedAt')->orderBy('updatedAt', 'desc');
-                    }
-                }
-
-                if ($request->rowPerPage > 0) {
-                    $defaultRowPerPage = $request->rowPerPage;
-                }
-
-                $goToPage = $request->goToPage;
-
-                $offset = ($goToPage - 1) * $defaultRowPerPage;
-
-                $count_data = $data->count();
-                $count_result = $count_data - $offset;
-
-                if ($count_result < 0) {
-                    $data = $data->offset(0)->limit($defaultRowPerPage)->get();
-                } else {
-                    $data = $data->offset($offset)->limit($defaultRowPerPage)->get();
-                }
-
-                $total_paging = $count_data / $defaultRowPerPage;
-
-                return response()->json(['totalPagination' => ceil($total_paging), 'data' => $data], 200);
+            if (!in_array($defaultOrderBy, ['asc', 'desc'])) {
+                return responseInvalid(['order value must be Ascending: ASC or Descending: DESC']);
             }
         }
+
+        // ── Apply select + order ──────────────────────────────────────────────────
+        $data = DB::table($data)->select($statusConfig['select'])->orderBy('updatedAt', 'desc');
+
+        if ($request->orderColumn) {
+            $data->orderBy($request->orderColumn, $defaultOrderBy);
+        }
+
+        // ── Pagination ────────────────────────────────────────────────────────────
+        $defaultRowPerPage = $request->rowPerPage > 0 ? $request->rowPerPage : $defaultRowPerPage;
+        $offset            = (($request->goToPage ?? 1) - 1) * $defaultRowPerPage;
+        $count_data        = $data->count();
+
+        $data = $data->offset(max(0, $offset))->limit($defaultRowPerPage)->get();
+
+        return response()->json([
+            'totalPagination' => ceil($count_data / $defaultRowPerPage),
+            'data'            => $data,
+        ], 200);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Shared base query builder (used by both Admin/Office and Doctor/Staff)
+    // ─────────────────────────────────────────────────────────────────────────────
+    private function buildLeaveBaseQuery(Request $request): mixed
+    {
+        $status       = strtolower($request->status);
+        $extraColumns = collect(self::STATUS_COLUMNS[$status]['extra'])
+            ->map(fn($col) => DB::raw($col))
+            ->toArray();
+
+        $select = array_merge(
+            array_map(fn($col) => DB::raw($col), self::BASE_COLUMNS),
+            $extraColumns
+        );
+
+        return LeaveRequest::from('leaveRequest as a')
+            ->leftJoin('jobTitle as b', 'a.jobTitle', '=', 'b.id')
+            ->select($select)
+            ->where('a.status', '=', $request->status);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Shared date range + search filters
+    // ─────────────────────────────────────────────────────────────────────────────
+    private function applyCommonFilters(mixed $data, Request $request): mixed
+    {
+        if (strtotime($request->fromDate) !== false && strtotime($request->toDate) !== false) {
+
+            $start = Carbon::parse($request->fromDate);
+            $end   = Carbon::parse($request->toDate);
+
+            if ($end < $start) {
+                return responseInvalid(['To date must be higher than from date!']);
+            }
+
+            $data->whereBetween('fromDate', [$request->fromDate, $request->toDate]);
+        }
+
+        return $data;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Admin / Office: sees all leave requests, filterable by location
+    // ─────────────────────────────────────────────────────────────────────────────
+    public function indexLeaveAdminandOffice(Request $request): mixed
+    {
+        $data = $this->buildLeaveBaseQuery($request);
+
+        if ($request->locationId) {
+            $data->where(function ($query) use ($request) {
+                foreach ($request->locationId as $id) {
+                    $query->orWhereRaw('FIND_IN_SET(?, a.locationId)', [$id]);
+                }
+            });
+        }
+
+        $data = $this->applyCommonFilters($data, $request);
+
+        if ($request->search) {
+            $column = $this->SearchRequestLeaveAdminOffice($request);
+
+            if (!$column) return null;
+
+            $data->where(
+                $column,
+                is_numeric($request->search) ? '=' : 'like',
+                is_numeric($request->search) ? $request->search : '%' . $request->search . '%'
+            );
+        }
+
+        return $data;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Doctor / Staff: sees only their own leave requests
+    // ─────────────────────────────────────────────────────────────────────────────
+    public function indexLeaveDoctorandStaff(Request $request): mixed
+    {
+        $data = $this->buildLeaveBaseQuery($request)
+            ->where('a.usersId', '=', $request->user()->id);
+
+        $data = $this->applyCommonFilters($data, $request);
+
+        if ($request->search) {
+            $column = $this->SearchRequestLeaveStaffDoctor($request);
+
+            if (!$column) return null;
+
+            $data->where(
+                $column,
+                is_numeric($request->search) ? '=' : 'like',
+                is_numeric($request->search) ? $request->search : '%' . $request->search . '%'
+            );
+        }
+
+        return $data;
     }
 
 
