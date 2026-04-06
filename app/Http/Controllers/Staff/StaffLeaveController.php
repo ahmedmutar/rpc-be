@@ -1809,7 +1809,8 @@ class StaffLeaveController extends Controller
     ];
 
     // ─────────────────────────────────────────────────────────────────────────────
-    // Base select columns shared by all statuses
+    // Base select columns shared by all statuses.
+    // Plain strings are passed as-is; only actual SQL expressions use DB::raw().
     // ─────────────────────────────────────────────────────────────────────────────
     private const BASE_COLUMNS = [
         'a.id as leaveRequestId',
@@ -1818,11 +1819,15 @@ class StaffLeaveController extends Controller
         'a.locationName as locationName',
         'a.locationId as locationId',
         'a.leaveType as leaveType',
-        "IFNULL(DATE_FORMAT(a.fromDate, '%d/%m/%Y %H:%i:%s'),'') as fromDate",
         'a.duration as duration',
         'a.remark as remark',
-        "IFNULL(DATE_FORMAT(a.created_at, '%d/%m/%Y %H:%i:%s'),'') as createdAt",
         'a.updated_at as updatedAt',
+    ];
+
+    // SQL expressions that require DB::raw() — kept separate from plain columns
+    private const BASE_COLUMNS_RAW = [
+        "IFNULL(DATE_FORMAT(a.fromDate, '%d/%m/%Y %H:%i:%s'),'') as fromDate",
+        "IFNULL(DATE_FORMAT(a.created_at, '%d/%m/%Y %H:%i:%s'),'') as createdAt",
     ];
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -1900,14 +1905,14 @@ class StaffLeaveController extends Controller
     private function buildLeaveBaseQuery(Request $request): mixed
     {
         $status       = strtolower($request->status);
+        // Wrap extra columns in DB::raw() only if they contain SQL expressions
         $extraColumns = collect(self::STATUS_COLUMNS[$status]['extra'])
-            ->map(fn($col) => DB::raw($col))
+            ->map(fn($col) => str_contains($col, '(') ? DB::raw($col) : $col)
             ->toArray();
 
-        $select = array_merge(
-            array_map(fn($col) => DB::raw($col), self::BASE_COLUMNS),
-            $extraColumns
-        );
+        // Plain columns passed as strings; raw expressions wrapped in DB::raw()
+        $rawBase = array_map(fn($col) => DB::raw($col), self::BASE_COLUMNS_RAW);
+        $select  = array_merge(self::BASE_COLUMNS, $rawBase, $extraColumns);
 
         return LeaveRequest::from('leaveRequest as a')
             ->leftJoin('jobTitle as b', 'a.jobTitle', '=', 'b.id')
