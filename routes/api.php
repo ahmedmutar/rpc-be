@@ -48,7 +48,9 @@ use App\Http\Controllers\Customer\TemplateCustomerController;
 use App\Http\Controllers\Transaction\TransPetClinicController;
 use App\Http\Controllers\AccessControl\AccessControlController;
 use App\Http\Controllers\Customer\DataStaticCustomerController;
+use App\Http\Controllers\Finance\DataStaticController as FinanceDataStaticController;
 use App\Http\Controllers\Finance\ExpensesController;
+use App\Http\Controllers\Finance\FinanceController;
 use App\Http\Controllers\Finance\FinanceDashboardController;
 use App\Http\Controllers\Product\StockOpnameController;
 use App\Http\Controllers\Staff\AccessControlSchedulesController;
@@ -823,6 +825,20 @@ Route::group(['middleware' => ['jwt.verify']], function () {
 
     Route::group(['prefix' => 'finance'], function () {
 
+        Route::get('/vendor', [FinanceController::class, 'listVendor']);
+        Route::post('/vendor', [FinanceController::class, 'addVendor']);
+        Route::get('/category', [FinanceController::class, 'listCategory']);
+        Route::post('/category', [FinanceController::class, 'addCategory']);
+        Route::get('/expense-type', [FinanceController::class, 'listExpenseType']);
+        Route::post('/expense-type', [FinanceController::class, 'addExpenseType']);
+        Route::get('/department', [FinanceController::class, 'listDepartment']);
+        Route::post('/department', [FinanceController::class, 'addDepartment']);
+        Route::get('/payment-status', [FinanceController::class, 'listPaymentStatus']);
+        Route::post('/payment-status', [FinanceController::class, 'addPaymentStatus']);
+        Route::get('/payment-method', [FinanceController::class, 'listPaymentMethod']);
+        Route::post('/payment-method', [FinanceController::class, 'addPaymentMethod']);
+
+
         Route::group(['prefix' => 'dashboard'], function () {
             Route::get('/', [FinanceDashboardController::class, 'index']);
         });
@@ -830,6 +846,11 @@ Route::group(['middleware' => ['jwt.verify']], function () {
         Route::group(['prefix' => 'expenses'], function () {
             Route::get('/export', [ExpensesController::class, 'export']);
             Route::get('/', [ExpensesController::class, 'index']);
+        });
+
+        Route::group(['prefix' => 'data-static'], function () {
+            Route::get('/', [FinanceDataStaticController::class, 'index']);
+            Route::delete('/', [FinanceDataStaticController::class, 'delete']);
         });
     });
 
