@@ -843,9 +843,13 @@ Route::group(['middleware' => ['jwt.verify']], function () {
             Route::get('/', [FinanceDashboardController::class, 'index']);
         });
 
-        Route::group(['prefix' => 'expenses'], function () {
-            Route::get('/export', [ExpensesController::class, 'export']);
+        Route::group(['prefix' => 'expense'], function () {
             Route::get('/', [ExpensesController::class, 'index']);
+            Route::post('/', [ExpensesController::class, 'create']);
+            Route::get('/detail', [ExpensesController::class, 'detail']);
+            Route::post('/approval', [ExpensesController::class, 'approval']);
+            Route::get('/export', [ExpensesController::class, 'export']);
+            Route::delete('/', [ExpensesController::class, 'delete']);
         });
 
         Route::group(['prefix' => 'data-static'], function () {
