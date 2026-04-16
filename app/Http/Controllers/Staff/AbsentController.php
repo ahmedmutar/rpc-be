@@ -232,14 +232,12 @@ class AbsentController extends Controller
         if (!empty($request->locationId)) {
             $location = ' ' . DB::table('location')
                 ->whereIn('id', $request->locationId)
-                ->groupBy(DB::raw('1'))
                 ->value(DB::raw("GROUP_CONCAT(locationName SEPARATOR ', ')"));
         }
 
         if (!empty($request->staffJob)) {
             $jobName = ' ' . DB::table('jobTitle')
                 ->whereIn('id', $request->staffJob)
-                ->groupBy(DB::raw('1'))
                 ->value(DB::raw("GROUP_CONCAT(jobName SEPARATOR ', ')"));
         }
 
@@ -259,14 +257,13 @@ class AbsentController extends Controller
             $allDates[] = $cursor->toDateString();
             $cursor->addDay();
         }
-        $totalDays = count($allDates);
 
         // ── 3. Bulk-load locations ────────────────────────────────────────────
         $locationQuery = DB::table('location')->where('isDeleted', 0);
         if (!empty($request->locationId) && $request->locationId[0] !== null) {
             $locationQuery->whereIn('id', $request->locationId);
         }
-        $locations = $locationQuery->get();
+        $locations   = $locationQuery->get();
         $locationIds = $locations->pluck('id')->all();
 
         // ── 4. Bulk-load ALL users for these locations in ONE query ───────────
@@ -283,9 +280,9 @@ class AbsentController extends Controller
             $userQuery->whereIn('u.id', $request->staff);
         }
 
-        // Group users by locationId: [ locationId => [user, ...] ]
-        $usersByLocation = $userQuery->get()->groupBy('locationId');
-        $allUserIds = $userQuery->pluck('u.id')->all();
+        $allUsers        = $userQuery->get();
+        $usersByLocation = $allUsers->groupBy('locationId');
+        $allUserIds      = $allUsers->pluck('id')->all();
 
         // ── 5. Bulk-load ALL absences in ONE query ────────────────────────────
         $absences = DB::table('staffAbsents as sa')
@@ -330,7 +327,7 @@ class AbsentController extends Controller
 
         // ── 7. Build spreadsheet ──────────────────────────────────────────────
         $spreadsheet = IOFactory::load(public_path('/template/absen/Template_Export_Absen2.xlsx'));
-        $sheet = $spreadsheet->getSheet(0);
+        $sheet       = $spreadsheet->getSheet(0);
 
         // Static header columns A–C
         $sheet->setCellValue('A2', 'Nama Cabang');
@@ -359,18 +356,18 @@ class AbsentController extends Controller
             $colIndex += 3;
         }
 
-        // Summary header columns
+        // ── 8. Summary header columns ─────────────────────────────────────────
         $summaryHeaders = [
-            'Total Masuk'                           => 11,
-            'Total Libur'                           => 11,
-            'Total Tidak Masuk/Izin'                => 20,
-            'Sakit'                                 => 11,
-            'Cuti'                                  => 11,
-            'Total Telat/Tidak Absen Masuk/Pulang'  => 33,
-            'Long Shift'                            => 11,
-            'Full Shift'                            => 11,
-            'Hard Shift'                            => 11,
-            'Atribut Tidak Lengkap'                 => 19,
+            'Total Masuk'                          => 11,
+            'Total Libur'                          => 11,
+            'Total Tidak Masuk/Izin'               => 20,
+            'Sakit'                                => 11,
+            'Cuti'                                 => 11,
+            'Total Telat/Tidak Absen Masuk/Pulang' => 33,
+            'Long Shift'                           => 11,
+            'Full Shift'                           => 11,
+            'Hard Shift'                           => 11,
+            'Atribut Tidak Lengkap'                => 19,
         ];
 
         $yellowFill = [
@@ -380,7 +377,13 @@ class AbsentController extends Controller
             ],
         ];
 
-        $summaryStartCol = $colIndex;
+        $redFill = [
+            'fill' => [
+                'fillType'   => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'FF0000'],
+            ],
+        ];
+
         foreach ($summaryHeaders as $header => $width) {
             $colChar = Coordinate::stringFromColumnIndex($colIndex);
             $sheet->getColumnDimension($colChar)->setWidth($width);
@@ -391,14 +394,7 @@ class AbsentController extends Controller
             $colIndex++;
         }
 
-        // ── 8. Write data rows (zero DB queries inside loops) ─────────────────
-        $redFill = [
-            'fill' => [
-                'fillType'   => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                'startColor' => ['rgb' => 'FF0000'],
-            ],
-        ];
-
+        // ── 9. Write data rows (zero DB queries inside loops) ─────────────────
         $currentRow = 3;
 
         foreach ($locations as $loc) {
@@ -409,16 +405,15 @@ class AbsentController extends Controller
                 $sheet->setCellValue('B' . $currentRow, $usr->jobName);
                 $sheet->setCellValue('C' . $currentRow, $usr->name);
 
-                $colIndex    = 4;
-                $totalMasuk  = 0;
-                $totalTelat  = 0;
-                $tidakAbsen  = 0;
+                $colIndex   = 4;
+                $totalMasuk = 0;
+                $totalTelat = 0;
+                $tidakAbsen = 0;
 
                 foreach ($allDates as $dateString) {
                     $absent = $absenceMap[$usr->id][$dateString] ?? null;
 
                     if ($absent) {
-                        // Late highlight on check-in cell
                         if ($absent->status === 'Terlambat') {
                             $totalTelat++;
                             $sheet->getStyle(Coordinate::stringFromColumnIndex($colIndex) . $currentRow)
@@ -439,7 +434,6 @@ class AbsentController extends Controller
                         $totalMasuk++;
                     } else {
                         $tidakAbsen++;
-                        // Paint all 3 sub-columns red
                         $rangeStart = Coordinate::stringFromColumnIndex($colIndex);
                         $rangeEnd   = Coordinate::stringFromColumnIndex($colIndex + 2);
                         $sheet->getStyle("{$rangeStart}{$currentRow}:{$rangeEnd}{$currentRow}")
@@ -449,7 +443,7 @@ class AbsentController extends Controller
                     $colIndex += 3;
                 }
 
-                // Summary columns (order matches $summaryHeaders)
+                // Summary columns
                 $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex)     . $currentRow, $totalMasuk);
                 $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 1) . $currentRow, 0); // Total Libur
                 $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 2) . $currentRow, 0); // Tidak Masuk/Izin
@@ -458,15 +452,14 @@ class AbsentController extends Controller
                 $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 5) . $currentRow, $tidakAbsen);
                 $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 6) . $currentRow, $longShifts[$usr->id] ?? 0);
                 $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 7) . $currentRow, $fullShifts[$usr->id] ?? 0);
-                // Hard Shift & Atribut Tidak Lengkap → placeholders
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 8) . $currentRow, 0);
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 9) . $currentRow, 0);
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 8) . $currentRow, 0); // Hard Shift
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 9) . $currentRow, 0); // Atribut Tidak Lengkap
 
                 $currentRow++;
             }
         }
 
-        // ── 9. Apply global border + alignment in ONE call ────────────────────
+        // ── 10. Apply global border + alignment in ONE call ───────────────────
         $lastCol = Coordinate::stringFromColumnIndex($colIndex + 9);
         $sheet->getStyle("A1:{$lastCol}" . ($currentRow - 1))->applyFromArray([
             'alignment' => [
@@ -478,7 +471,7 @@ class AbsentController extends Controller
             ],
         ]);
 
-        // ── 10. Stream response (skip double-save) ────────────────────────────
+        // ── 11. Stream response ───────────────────────────────────────────────
         $writer = IOFactory::createWriter($spreadsheet, 'Xlsx');
 
         return response()->stream(function () use ($writer) {
