@@ -226,327 +226,267 @@ class AbsentController extends Controller
 
     public function Export(Request $request)
     {
-        $fileName = "";
-        $date = "";
-        $location = "";
-        $jobName = "";
+        // ── 1. Build file name ────────────────────────────────────────────────
+        $location = $jobName = $date = '';
 
-        if ($request->locationId) {
-            $dataLocation = DB::table('location as l')
-                ->select(DB::raw("GROUP_CONCAT(l.locationName SEPARATOR ', ') as location"))
-                ->whereIn('l.id', $request->locationId)
-                ->distinct()
-                ->pluck('location')
-                ->first();
-
-            $location = " " . $dataLocation;
+        if (!empty($request->locationId)) {
+            $location = ' ' . DB::table('location')
+                ->whereIn('id', $request->locationId)
+                ->groupBy(DB::raw('1'))
+                ->value(DB::raw("GROUP_CONCAT(locationName SEPARATOR ', ')"));
         }
 
-        if ($request->staffJob) {
-            $dataJob = DB::table('jobTitle')
-                ->select(DB::raw("GROUP_CONCAT(jobName SEPARATOR ', ') as jobName"))
+        if (!empty($request->staffJob)) {
+            $jobName = ' ' . DB::table('jobTitle')
                 ->whereIn('id', $request->staffJob)
-                ->distinct()
-                ->pluck('jobName')
-                ->first();
-
-            $jobName = " " . $dataJob;
+                ->groupBy(DB::raw('1'))
+                ->value(DB::raw("GROUP_CONCAT(jobName SEPARATOR ', ')"));
         }
-
-        if ($request->dateFrom && $request->dateTo) {
-            $fromDate = Carbon::parse($request->dateFrom);
-            $toDate = Carbon::parse($request->dateTo);
-
-            $date = " " . $fromDate->format('dMY') . " - " . $toDate->format('dMY');
-        }
-
-        $fileName = "Rekap Absensi" . $jobName . $location . $date . ".xlsx";
-
-        $spreadsheet = IOFactory::load(public_path() . '/template/absen/' . 'Template_Export_Absen2.xlsx');
-
-        $sheet = $spreadsheet->getSheet(0);
 
         $dateFrom = Carbon::parse($request->dateFrom);
-        $dateTo = Carbon::parse($request->dateTo);
+        $dateTo   = Carbon::parse($request->dateTo);
 
-        $allDates = [];
-        $currentDate = $dateFrom->copy();
-        while ($currentDate->lessThanOrEqualTo($dateTo)) {
-            $allDates[] = $currentDate->toDateString();
-            $currentDate->addDay();
+        if ($request->dateFrom && $request->dateTo) {
+            $date = ' ' . $dateFrom->format('dMY') . ' - ' . $dateTo->format('dMY');
         }
 
+        $fileName = "Rekap Absensi{$jobName}{$location}{$date}.xlsx";
+
+        // ── 2. Pre-build date range once ──────────────────────────────────────
+        $allDates = [];
+        $cursor   = $dateFrom->copy();
+        while ($cursor->lessThanOrEqualTo($dateTo)) {
+            $allDates[] = $cursor->toDateString();
+            $cursor->addDay();
+        }
+        $totalDays = count($allDates);
+
+        // ── 3. Bulk-load locations ────────────────────────────────────────────
+        $locationQuery = DB::table('location')->where('isDeleted', 0);
+        if (!empty($request->locationId) && $request->locationId[0] !== null) {
+            $locationQuery->whereIn('id', $request->locationId);
+        }
+        $locations = $locationQuery->get();
+        $locationIds = $locations->pluck('id')->all();
+
+        // ── 4. Bulk-load ALL users for these locations in ONE query ───────────
+        $userQuery = DB::table('users as u')
+            ->join('usersLocation as ul', 'ul.usersId', 'u.id')
+            ->join('location as l', 'ul.locationId', 'l.id')
+            ->join('jobTitle as j', 'u.jobTitleId', 'j.id')
+            ->select('u.id', 'u.firstName as name', 'l.locationName', 'j.jobName', 'ul.locationId')
+            ->where('ul.isMainLocation', 1)
+            ->where('u.isDeleted', 0)
+            ->whereIn('ul.locationId', $locationIds);
+
+        if (!empty($request->staff) && $request->staff[0] !== null) {
+            $userQuery->whereIn('u.id', $request->staff);
+        }
+
+        // Group users by locationId: [ locationId => [user, ...] ]
+        $usersByLocation = $userQuery->get()->groupBy('locationId');
+        $allUserIds = $userQuery->pluck('u.id')->all();
+
+        // ── 5. Bulk-load ALL absences in ONE query ────────────────────────────
+        $absences = DB::table('staffAbsents as sa')
+            ->select(
+                'sa.userId',
+                DB::raw("DATE(sa.presentTime) as absentDate"),
+                DB::raw("DATE_FORMAT(sa.presentTime, '%H:%i') as presentTime"),
+                DB::raw("DATE_FORMAT(sa.homeTime, '%H:%i') as homeTime"),
+                'sa.duration',
+                'sa.status'
+            )
+            ->whereIn('sa.userId', $allUserIds)
+            ->where('sa.statusPresent', 1)
+            ->where('sa.isDeleted', 0)
+            ->whereBetween(DB::raw('DATE(sa.presentTime)'), [$request->dateFrom, $request->dateTo])
+            ->get();
+
+        // Index: [ userId => [ date => absence ] ]
+        $absenceMap = [];
+        foreach ($absences as $abs) {
+            $absenceMap[$abs->userId][$abs->absentDate] = $abs;
+        }
+
+        // ── 6. Bulk-load ALL shift counts in ONE query each ──────────────────
+        $longShifts = DB::table('long_shifts')
+            ->select('userId', DB::raw('COUNT(*) as total'))
+            ->whereIn('userId', $allUserIds)
+            ->where('isDeleted', 0)
+            ->where('status', 1)
+            ->whereBetween('longShiftDate', [$request->dateFrom, $request->dateTo])
+            ->groupBy('userId')
+            ->pluck('total', 'userId');
+
+        $fullShifts = DB::table('full_shifts')
+            ->select('userId', DB::raw('COUNT(*) as total'))
+            ->whereIn('userId', $allUserIds)
+            ->where('isDeleted', 0)
+            ->where('status', 1)
+            ->whereBetween('fullShiftDate', [$request->dateFrom, $request->dateTo])
+            ->groupBy('userId')
+            ->pluck('total', 'userId');
+
+        // ── 7. Build spreadsheet ──────────────────────────────────────────────
+        $spreadsheet = IOFactory::load(public_path('/template/absen/Template_Export_Absen2.xlsx'));
+        $sheet = $spreadsheet->getSheet(0);
+
+        // Static header columns A–C
         $sheet->setCellValue('A2', 'Nama Cabang');
         $sheet->setCellValue('B2', 'Jabatan');
         $sheet->setCellValue('C2', 'Nama');
-
-        $sheet->getColumnDimension('A')->setWidth(25); // Nama Cabang
-        $sheet->getColumnDimension('B')->setWidth(15); // Jabatan
+        $sheet->getColumnDimension('A')->setWidth(25);
+        $sheet->getColumnDimension('B')->setWidth(15);
         $sheet->getColumnDimension('C')->setWidth(30);
 
-        $colIndex = 4; // Kolom D adalah indeks 3
+        // Dynamic date columns
+        $colIndex = 4;
         foreach ($allDates as $dateString) {
-            $day = Carbon::parse($dateString)->day;
+            $day          = Carbon::parse($dateString)->day;
             $startColChar = Coordinate::stringFromColumnIndex($colIndex);
-            $endColChar = Coordinate::stringFromColumnIndex($colIndex + 2);
+            $endColChar   = Coordinate::stringFromColumnIndex($colIndex + 2);
 
-            $sheet->mergeCells($startColChar . '1:' . $endColChar . '1');
-            $sheet->setCellValue($startColChar . '1', $day);
-            $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . '2', 'Masuk');
+            $sheet->mergeCells("{$startColChar}1:{$endColChar}1");
+            $sheet->setCellValue("{$startColChar}1", $day);
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex)     . '2', 'Masuk');
             $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 1) . '2', 'Pulang');
             $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 2) . '2', 'Jam Kerja');
+            $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($colIndex))->setWidth(12);
+            $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($colIndex + 1))->setWidth(12);
+            $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($colIndex + 2))->setWidth(12);
 
-            $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($colIndex))->setWidth(12);     // Masuk
-            $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($colIndex + 1))->setWidth(12); // Pulang
-            $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($colIndex + 2))->setWidth(12); // Jam Kerja
             $colIndex += 3;
         }
 
-        // Setel header summary dinamis (Baris 1 dan 2)
+        // Summary header columns
         $summaryHeaders = [
-            'Total Masuk',
-            'Total Libur',
-            'Total Tidak Masuk/Izin',
-            'Sakit',
-            'Cuti',
-            'Total Telat/Tidak Absen Masuk/Pulang',
-            'Long Shift',
-            'Full Shift',
-            'Hard Shift',
-            'Atribut Tidak Lengkap'
+            'Total Masuk'                           => 11,
+            'Total Libur'                           => 11,
+            'Total Tidak Masuk/Izin'                => 20,
+            'Sakit'                                 => 11,
+            'Cuti'                                  => 11,
+            'Total Telat/Tidak Absen Masuk/Pulang'  => 33,
+            'Long Shift'                            => 11,
+            'Full Shift'                            => 11,
+            'Hard Shift'                            => 11,
+            'Atribut Tidak Lengkap'                 => 19,
         ];
 
-        foreach ($summaryHeaders as $summaryHeader) {
-            $currentColChar = Coordinate::stringFromColumnIndex($colIndex);
+        $yellowFill = [
+            'fill' => [
+                'fillType'   => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'FFFF00'],
+            ],
+        ];
 
-            if ($summaryHeader == 'Total Tidak Masuk/Izin') {
-                $sheet->getColumnDimension($currentColChar)->setWidth(20);
-            } elseif ($summaryHeader == 'Total Telat/Tidak Absen Masuk/Pulang') {
-                $sheet->getColumnDimension($currentColChar)->setWidth(33);
-            } elseif ($summaryHeader == 'Atribut Tidak Lengkap') {
-                $sheet->getColumnDimension($currentColChar)->setWidth(19);
-            } else {
-                $sheet->getColumnDimension($currentColChar)->setWidth(11);
-            }
-
-            $sheet->setCellValue($currentColChar . '2', $summaryHeader);
-
-            if ($summaryHeader != 'Total Masuk') {
-
-                $sheet->getStyle($currentColChar . '2')->applyFromArray([
-                    'fill' => [
-                        'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                        'startColor' => [
-                            'rgb' => 'FFFF00', // Red background color
-                        ],
-                    ],
-                ]);
+        $summaryStartCol = $colIndex;
+        foreach ($summaryHeaders as $header => $width) {
+            $colChar = Coordinate::stringFromColumnIndex($colIndex);
+            $sheet->getColumnDimension($colChar)->setWidth($width);
+            $sheet->setCellValue("{$colChar}2", $header);
+            if ($header !== 'Total Masuk') {
+                $sheet->getStyle("{$colChar}2")->applyFromArray($yellowFill);
             }
             $colIndex++;
         }
 
-        $tmplocations = $request->locationId;
+        // ── 8. Write data rows (zero DB queries inside loops) ─────────────────
+        $redFill = [
+            'fill' => [
+                'fillType'   => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'FF0000'],
+            ],
+        ];
 
-        $locations = DB::table('location')
-            ->select('id', 'locationName')
-            ->where('isDeleted', '=', 0);
-
-        if (count($tmplocations) > 0) {
-            if (!$tmplocations[0] == null) {
-                $locations = $locations->whereIn('id', $tmplocations);
-            }
-        }
-
-        $locations = $locations->get();
-
-        $startDataRow = 3; // Data dimulai dari baris ke-3
-        $currentRow = $startDataRow;
-        $tempRow = 0;
+        $currentRow = 3;
 
         foreach ($locations as $loc) {
-
-            $users = DB::table('users as u')
-                ->join('usersLocation as ul', 'ul.usersId', 'u.id')
-                ->join('location as l', 'ul.locationId', 'l.id')
-                ->join('jobTitle as j', 'u.jobTitleId', 'j.id')
-                ->select(
-                    'u.id',
-                    'u.firstName as name',
-                    'l.locationName',
-                    'j.jobName'
-                )
-                ->where('ul.isMainLocation', '=', 1)
-                ->where('ul.locationId', '=', $loc->id)
-                ->where('u.isDeleted', '=', 0);
-
-            $tmpstaff = $request->staff;
-            //
-
-            if (count($tmpstaff) > 0) {
-                if (!$tmpstaff[0] == null) {
-                    $users = $users->whereIn('u.id', $tmpstaff);
-                }
-            }
-
-            $users = $users->get();
+            $users = $usersByLocation->get($loc->id, collect());
 
             foreach ($users as $usr) {
+                $sheet->setCellValue('A' . $currentRow, $loc->locationName);
+                $sheet->setCellValue('B' . $currentRow, $usr->jobName);
+                $sheet->setCellValue('C' . $currentRow, $usr->name);
 
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex(1) . $currentRow, $loc->locationName); // A + currentRow
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex(2) . $currentRow, $usr->jobName);    // B + currentRow
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex(3) . $currentRow, $usr->name);
+                $colIndex    = 4;
+                $totalMasuk  = 0;
+                $totalTelat  = 0;
+                $tidakAbsen  = 0;
 
-                $colIndex = 4; // Mulai dari kolom D
-                $currentDate = $dateFrom->copy(); // Gunakan copy() agar $dateFrom tidak berubah
-                $totalmasuk = 0;
-                $totaltelat = 0;
-                $tidakAbsen = 0;
-                while ($currentDate->lessThanOrEqualTo($dateTo)) {
-
-                    $absent = DB::table('staffAbsents as sa')
-                        ->select(
-                            DB::raw("DATE_FORMAT(sa.presentTime, '%H:%i') as presentTime"),
-                            DB::raw("DATE_FORMAT(sa.homeTime, '%H:%i') as homeTime"),
-                            'sa.duration',
-                            'sa.status'
-                        )
-                        ->where('sa.userId', '=', $usr->id)
-                        ->where('sa.statusPresent', '=', 1)
-                        ->where('sa.isDeleted', '=', 0)
-                        ->whereDate('sa.presentTime', $currentDate->toDateString())
-                        ->first();
+                foreach ($allDates as $dateString) {
+                    $absent = $absenceMap[$usr->id][$dateString] ?? null;
 
                     if ($absent) {
-                        if ($absent->status == 'Terlambat') {
-                            $totaltelat++;
-                            $sheet->getStyle(Coordinate::stringFromColumnIndex($colIndex) . $currentRow)->applyFromArray([
-                                'fill' => [
-                                    'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                                    'startColor' => [
-                                        'rgb' => 'FFFF00', // Yellow background color
-                                    ],
-                                ],
-                            ]);
-                        }
-                        $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . $currentRow, $absent->presentTime);
-                        $colIndex++;
-
-                        $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . $currentRow, $absent->homeTime);
-                        $colIndex++;
-
-                        if ($absent->duration == null) {
-                            $absent->duration = '00:00:00';
+                        // Late highlight on check-in cell
+                        if ($absent->status === 'Terlambat') {
+                            $totalTelat++;
+                            $sheet->getStyle(Coordinate::stringFromColumnIndex($colIndex) . $currentRow)
+                                ->applyFromArray($yellowFill);
                         }
 
-                        $formatted = \Carbon\Carbon::createFromFormat('H:i:s', $absent->duration)->format('G.i');
+                        $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex)     . $currentRow, $absent->presentTime);
+                        $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 1) . $currentRow, $absent->homeTime);
 
-                        $sheet->setCellValueExplicit(Coordinate::stringFromColumnIndex($colIndex) . $currentRow, $formatted, DataType::TYPE_STRING);
-                        $colIndex++;
-                        $totalmasuk++;
+                        $duration  = $absent->duration ?? '00:00:00';
+                        $formatted = Carbon::createFromFormat('H:i:s', $duration)->format('G.i');
+                        $sheet->setCellValueExplicit(
+                            Coordinate::stringFromColumnIndex($colIndex + 2) . $currentRow,
+                            $formatted,
+                            DataType::TYPE_STRING
+                        );
+
+                        $totalMasuk++;
                     } else {
                         $tidakAbsen++;
-
-                        $sheet->getStyle(Coordinate::stringFromColumnIndex($colIndex) . $currentRow)->applyFromArray([
-                            'fill' => [
-                                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                                'startColor' => [
-                                    'rgb' => 'FF0000', // Red background color
-                                ],
-                            ],
-                        ]);
-                        $colIndex++;
-
-                        $sheet->getStyle(Coordinate::stringFromColumnIndex($colIndex) . $currentRow)->applyFromArray([
-                            'fill' => [
-                                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                                'startColor' => [
-                                    'rgb' => 'FF0000', // Red background color
-                                ],
-                            ],
-                        ]);
-                        $colIndex++;
-
-                        $sheet->getStyle(Coordinate::stringFromColumnIndex($colIndex) . $currentRow)->applyFromArray([
-                            'fill' => [
-                                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                                'startColor' => [
-                                    'rgb' => 'FF0000', // Red background color
-                                ],
-                            ],
-                        ]);
-                        $colIndex++;
+                        // Paint all 3 sub-columns red
+                        $rangeStart = Coordinate::stringFromColumnIndex($colIndex);
+                        $rangeEnd   = Coordinate::stringFromColumnIndex($colIndex + 2);
+                        $sheet->getStyle("{$rangeStart}{$currentRow}:{$rangeEnd}{$currentRow}")
+                            ->applyFromArray($redFill);
                     }
-                    $currentDate->addDay();
+
+                    $colIndex += 3;
                 }
 
-                //total masuk
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . $currentRow, $totalmasuk);
-                $colIndex++;
-
-                //total libur
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . $currentRow, 0);
-                $colIndex++;
-
-                //total tidak masuk/izin
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . $currentRow, 0);
-                $colIndex++;
-
-                //sakit
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . $currentRow, 0);
-                $colIndex++;
-
-                //cuti
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . $currentRow, 0);
-                $colIndex++;
-
-                //tidak absen
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . $currentRow, $tidakAbsen);
-                $colIndex++;
-
-                //long shift
-                $longShft = DB::table('long_shifts')
-                    ->where('isDeleted', '=', 0)
-                    ->where('userId', '=', $usr->id)
-                    ->whereBetween('longShiftDate', [$request->dateFrom, $request->dateTo])
-                    ->where('status', '=', 1)
-                    ->count();
-
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . $currentRow, $longShft);
-                $colIndex++;
-
-                //full shift
-                $fullShft = DB::table('full_shifts')
-                    ->where('isDeleted', '=', 0)
-                    ->where('userId', '=', $usr->id)
-                    ->whereBetween('fullShiftDate', [$request->dateFrom, $request->dateTo])
-                    ->where('status', '=', 1)
-                    ->count();
-
-                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex) . $currentRow, $fullShft);
-                $colIndex++;
-
-                //hard shift tidak ada
+                // Summary columns (order matches $summaryHeaders)
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex)     . $currentRow, $totalMasuk);
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 1) . $currentRow, 0); // Total Libur
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 2) . $currentRow, 0); // Tidak Masuk/Izin
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 3) . $currentRow, 0); // Sakit
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 4) . $currentRow, 0); // Cuti
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 5) . $currentRow, $tidakAbsen);
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 6) . $currentRow, $longShifts[$usr->id] ?? 0);
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 7) . $currentRow, $fullShifts[$usr->id] ?? 0);
+                // Hard Shift & Atribut Tidak Lengkap → placeholders
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 8) . $currentRow, 0);
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($colIndex + 9) . $currentRow, 0);
 
                 $currentRow++;
-                $tempRow = $currentRow;
             }
         }
 
-        $lastColOfHeaders = Coordinate::stringFromColumnIndex($colIndex + 9);
-        $sheet->getStyle('A1:' . $lastColOfHeaders . ($tempRow - 1))->applyFromArray([
-            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
-            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]],
+        // ── 9. Apply global border + alignment in ONE call ────────────────────
+        $lastCol = Coordinate::stringFromColumnIndex($colIndex + 9);
+        $sheet->getStyle("A1:{$lastCol}" . ($currentRow - 1))->applyFromArray([
+            'alignment' => [
+                'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
+                'vertical'   => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
+            ],
+            'borders' => [
+                'allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN],
+            ],
         ]);
 
+        // ── 10. Stream response (skip double-save) ────────────────────────────
         $writer = IOFactory::createWriter($spreadsheet, 'Xlsx');
-        $newFilePath = public_path() . '/template_download/' . $fileName; // Set the desired path
-        $writer->save($newFilePath);
 
         return response()->stream(function () use ($writer) {
             $writer->save('php://output');
         }, 200, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            'Cache-Control'       => 'max-age=0',
         ]);
     }
 
