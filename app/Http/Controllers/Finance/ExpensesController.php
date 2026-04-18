@@ -127,8 +127,8 @@ class ExpensesController extends Controller
             'expenseTypeId.integer' => 'Expense Type Id harus angka',
             'departmentId.required' => 'Department Id harus diisi',
             'departmentId.integer' => 'Department Id harus angka',
-            'paymentStatus.required' => 'Payment Status harus diisi',
-            'paymentStatus.integer' => 'Payment Status harus angka',
+            'paymentStatusId.required' => 'Payment Status harus diisi',
+            'paymentStatusId.integer' => 'Payment Status harus angka',
         ];
 
         $validate = Validator::make($request->all(), [
@@ -143,7 +143,7 @@ class ExpensesController extends Controller
             'categoryId' => 'required|integer',
             'expenseTypeId' => 'required|integer',
             'departmentId' => 'required|integer',
-            'paymentStatus' => 'required|integer',
+            'paymentStatusId' => 'required|integer',
             'dueDate' => 'nullable|date',
             'paymentMethodId' => 'required|integer',
             'description' => 'required|string',
