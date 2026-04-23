@@ -11,12 +11,12 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ExpensesController extends Controller
 {
-    function index(Request $request)
+    public function index(Request $request)
     {
         $itemPerPage = $request->rowPerPage;
-
         $page = $request->goToPage;
 
+        // 1. Inisialisasi Query Utama
         $data = DB::table('expenses as e')
             ->join('users as u', 'e.userId', 'u.id')
             ->join('categoryFinances as cf', 'e.categoryId', 'cf.id')
@@ -42,32 +42,37 @@ class ExpensesController extends Controller
             ->where('e.isDeleted', '=', 0)
             ->where('e.statusApproval', '=', $request->statusApproval ? $request->statusApproval : 'Pending');
 
+        // 2. Filter Berdasarkan Lokasi
         if ($request->locationId) {
             $data = $data->where('e.locationId', $request->locationId);
         }
 
+        // 3. Filter Berdasarkan Rentang Tanggal
         if ($request->dateFrom && $request->dateTo) {
             $data = $data->whereBetween('e.transactionDate', [$request->dateFrom, $request->dateTo]);
         }
 
+        // 4. Logika Pencarian (Search)
         if ($request->search) {
             $res = $this->Search($request);
             if ($res) {
-                $data = $data->where($res[0], 'like', '%' . $request->search . '%');
+                // Menggunakan Parameter Grouping (Closure) agar filter Global tetap terjaga
+                $data = $data->where(function ($query) use ($res, $request) {
+                    $query->where($res[0], 'like', '%' . $request->search . '%');
 
-                for ($i = 1; $i < count($res); $i++) {
-
-                    $data = $data->orWhere($res[$i], 'like', '%' . $request->search . '%');
-                }
+                    for ($i = 1; $i < count($res); $i++) {
+                        $query->orWhere($res[$i], 'like', '%' . $request->search . '%');
+                    }
+                });
             } else {
-                $data = [];
                 return response()->json([
                     'totalPagination' => 0,
-                    'data' => $data
+                    'data' => []
                 ], 200);
             }
         }
 
+        // 5. Sorting/Ordering
         if ($request->orderValue) {
             if ($request->orderColumn == 'createdAt') {
                 $data = $data->orderBy('e.updated_at', $request->orderValue);
@@ -78,29 +83,43 @@ class ExpensesController extends Controller
             $data = $data->orderBy('e.updated_at', 'desc');
         }
 
+        // 6. Pagination dan Response
         if ($itemPerPage) {
-
             $offset = ($page - 1) * $itemPerPage;
-
             $count_data = $data->count();
             $count_result = $count_data - $offset;
 
             if ($count_result < 0) {
-                $data = $data->offset(0)->limit($itemPerPage)->get();
+                $result_data = $data->offset(0)->limit($itemPerPage)->get();
             } else {
-                $data = $data->offset($offset)->limit($itemPerPage)->get();
+                $result_data = $data->offset($offset)->limit($itemPerPage)->get();
             }
 
-            $totalPaging = $count_data / $itemPerPage;
+            $totalPaging = ceil($count_data / $itemPerPage);
 
             return response()->json([
-                'totalPagination' => ceil($totalPaging),
-                'data' => $data
+                'totalPagination' => $totalPaging,
+                'data' => $result_data
             ], 200);
         } else {
-            $data = $data->get();
-            return response()->json($data);
+            return response()->json($data->get());
         }
+    }
+
+    /**
+     * Fungsi untuk mendefinisikan kolom yang dapat dicari
+     */
+    private function Search($request)
+    {
+        return [
+            'e.referenceNo',
+            'cf.categoryName',
+            'vf.vendorName',
+            'l.locationName',
+            'u.firstName',
+            'ua.firstName',
+            'ps.paymentStatus'
+        ];
     }
 
     function create(Request $request)
