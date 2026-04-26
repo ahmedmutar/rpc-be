@@ -177,7 +177,7 @@ class CustomerController extends Controller
                     'a.id as id',
                     'a.memberNo',
                     DB::raw("IFNULL ((cg.customerGroup),'') as customerGroup"),
-                    DB::raw("CONCAT(IFNULL(a.firstName,''), case when a.middleName is null then '' else ' ' end , IFNULL(a.middleName,'') ,case when a.lastName is null then '' else ' ' end, case when a.lastName is null then '' else a.lastName end ) as customerName"),
+                    DB::raw("CONCAT_WS(' ', a.firstName, a.middleName, a.lastName) as customerName"),
                     DB::raw("IFNULL ((b.jumlah),0) as totalPet"),
                     'd.locationName as location',
                     'a.locationId as locationId',
@@ -208,27 +208,11 @@ class CustomerController extends Controller
                 ]);
 
             if ($request->locationId) {
-
-                $val = [];
-                foreach ($request->locationId as $temp) {
-                    $val = $temp;
-                }
-
-                if ($val) {
-                    $data = $data->whereIn('a.locationid', $request->locationId);
-                }
+                $data = $data->whereIn('a.locationid', $request->locationId);
             }
 
             if ($request->customerGroupId) {
-
-                $val = [];
-                foreach ($request->customerGroupId as $temp) {
-                    $val = $temp;
-                }
-
-                if ($val) {
-                    $data = $data->whereIn('a.customerGroupId', $request->customerGroupId);
-                }
+                $data = $data->whereIn('a.customerGroupId', $request->customerGroupId);
             }
 
 
@@ -338,43 +322,14 @@ class CustomerController extends Controller
             }
 
 
+            $data = DB::table($data)
+                ->select('id', 'memberNo', 'customerGroup', 'customerName', 'totalPet', 'location', 'phoneNumber', 'isWhatsapp', 'emailAddress', 'createdBy', 'createdAt');
+
             if ($checkOrder) {
-
-                $data = DB::table($data)
-                    ->select(
-                        'id',
-                        'memberNo',
-                        'customerGroup',
-                        'customerName',
-                        'totalPet',
-                        'location',
-                        'phoneNumber',
-                        'isWhatsapp',
-                        'emailAddress',
-                        'createdBy',
-                        'createdAt',
-                    )
-                    ->orderBy($request->orderColumn, $defaultOrderBy)
-                    ->orderBy('updated_at', 'desc');
-            } else {
-
-
-                $data = DB::table($data)
-                    ->select(
-                        'id',
-                        'memberNo',
-                        'customerGroup',
-                        'customerName',
-                        'totalPet',
-                        'location',
-                        'phoneNumber',
-                        'isWhatsapp',
-                        'emailAddress',
-                        'createdBy',
-                        'createdAt',
-                    )
-                    ->orderBy('updated_at', 'desc');
+                $data = $data->orderBy($request->orderColumn, $defaultOrderBy);
             }
+
+            $data = $data->orderBy('updated_at', 'desc');
 
 
             if ($request->rowPerPage > 0) {
@@ -473,765 +428,63 @@ class CustomerController extends Controller
     }
 
 
+    private function buildCustomerBaseQuery($request)
+    {
+        $query = DB::table('customer as a')
+            ->leftjoin(
+                DB::raw('(select count(id) as jumlah, customerId from `customerPets` where isDeleted=0 GROUP by customerId) as b'),
+                fn($join) => $join->on('b.customerId', '=', 'a.id')
+            )
+            ->leftjoin('location as d', 'd.id', '=', 'a.locationId')
+            ->leftjoin('customerGroups as cg', 'cg.id', '=', 'a.customerGroupId')
+            ->join('users as u', 'a.createdBy', 'u.id')
+            ->select(
+                'a.id as id',
+                'a.memberNo',
+                DB::raw("IFNULL(cg.customerGroup, '') as customerGroup"),
+                DB::raw("CONCAT_WS(' ', a.firstName, a.middleName, a.lastName) as customerName"),
+                DB::raw("IFNULL(b.jumlah, 0) as totalPet"),
+                'd.locationName as location',
+                'a.locationId as locationId',
+                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0) = 0 then '' else
+                    (select ct.phoneNumber from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0 limit 1) END as phoneNumber"),
+                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.type='Whatsapp' and ct.usage='Utama' and ct.isDeleted=0) > 0 THEN true ELSE false END AS isWhatsapp"),
+                DB::raw("CASE WHEN (select count(*) from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0) = 0 THEN '' ELSE
+                    (select ce.email from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0 LIMIT 1) END AS emailAddress"),
+                'u.firstName as createdBy',
+                DB::raw('a.created_at as createdAt'),
+                'a.updated_at'
+            )
+            ->where('a.isDeleted', '=', '0');
+
+        if ($request->locationId) {
+            $query->whereIn('a.locationId', $request->locationId);
+        }
+
+        return $query;
+    }
+
     private function Search($request)
     {
+        $searchableColumns = [
+            'customerName', 'memberNo', 'totalPet', 'location',
+            'phoneNumber', 'isWhatsapp', 'emailAddress', 'createdBy', 'createdAt',
+        ];
 
-        //customer name
-        $data = DB::table('customer as a')
-            ->leftjoin(
-                DB::raw('(
-					select count(id)as jumlah,customerId from `customerPets` where isDeleted=0
-					GROUP by customerId
-				) as b'),
-                function ($join) {
-                    $join->on('b.customerId', '=', 'a.id');
-                }
-            )
-            ->leftjoin('location as d', 'd.id', '=', 'a.locationId')
-            ->leftjoin('customerGroups as cg', 'cg.id', '=', 'a.customerGroupId')
-            ->join('users as u', 'a.createdBy', 'u.id')
-            ->select(
-                'a.id as id',
-                'a.memberNo',
-                DB::raw("IFNULL ((cg.customerGroup),'') as customerGroup"),
-                DB::raw("CONCAT(IFNULL(a.firstName,''), case when a.middleName is null then '' else ' ' end , IFNULL(a.middleName,'') ,case when a.lastName is null then '' else ' ' end, case when a.lastName is null then '' else a.lastName end ) as customerName"),
-                DB::raw("IFNULL ((b.jumlah),0) as totalPet"),
-                'd.locationName as location',
-                'a.locationId as locationId',
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0) = 0 then '' else
-                    (select ct.phoneNumber from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0 limit 1) END as phoneNumber"),
+        foreach ($searchableColumns as $column) {
+            $exists = DB::table($this->buildCustomerBaseQuery($request))
+                ->select('id', 'memberNo', 'customerName', 'totalPet', 'location', 'locationId', 'phoneNumber', 'isWhatsapp', 'emailAddress', 'createdBy', 'createdAt', 'updated_at')
+                ->where($column, 'like', '%' . $request->search . '%')
+                ->exists();
 
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.type='Whatsapp' and ct.usage='Utama' and ct.isDeleted=0) > 0 THEN true ELSE false END AS isWhatsapp"),
-
-                DB::raw("CASE WHEN (select count(*) from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0) = 0 THEN '' ELSE
-                    (select ce.email from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0 LIMIT 1) END AS emailAddress"),
-
-                // DB::raw("CONCAT(e.phoneNumber) as phoneNumber"),
-                // DB::raw("CASE WHEN lower(e.type)='whatshapp' then true else false end as isWhatsapp"),
-                //'f.email as emailAddress',
-                'u.firstName as createdBy',
-                DB::raw('a.created_at as createdAt'),
-                'a.updated_at'
-            )
-            ->where([
-                ['a.isDeleted', '=', '0']
-            ]);
-
-        if ($request->locationId) {
-
-            $val = [];
-            foreach ($request->locationId as $temp) {
-                $val = $temp;
+            if ($exists) {
+                return $column;
             }
-
-            if ($val) {
-                $data = $data->whereIn('a.locationid', $request->locationId);
-            }
-        }
-
-        $data = DB::table($data)
-            ->select(
-                'id',
-                'memberNo',
-                'customerName',
-                'totalPet',
-                'location',
-                'locationId',
-                'phoneNumber',
-                'isWhatsapp',
-                'emailAddress',
-                'createdBy',
-                'createdAt',
-                'updated_at'
-            );
-
-
-
-
-        if ($request->search) {
-
-            $data = $data->where('customerName', 'like', '%' . $request->search . '%');
-        }
-
-
-        $data = $data->get();
-
-        if (count($data)) {
-            $temp_column = 'customerName';
-            return $temp_column;
-        }
-
-        //member no
-        $data = DB::table('customer as a')
-            ->leftjoin(
-                DB::raw('(
-					select count(id)as jumlah,customerId from `customerPets` where isDeleted=0
-					GROUP by customerId
-				) as b'),
-                function ($join) {
-                    $join->on('b.customerId', '=', 'a.id');
-                }
-            )
-            ->leftjoin('location as d', 'd.id', '=', 'a.locationId')
-            ->leftjoin('customerGroups as cg', 'cg.id', '=', 'a.customerGroupId')
-            ->join('users as u', 'a.createdBy', 'u.id')
-            ->select(
-                'a.id as id',
-                'a.memberNo',
-                DB::raw("IFNULL ((cg.customerGroup),'') as customerGroup"),
-                DB::raw("CONCAT(IFNULL(a.firstName,''), case when a.middleName is null then '' else ' ' end , IFNULL(a.middleName,'') ,case when a.lastName is null then '' else ' ' end, case when a.lastName is null then '' else a.lastName end ) as customerName"),
-                DB::raw("IFNULL ((b.jumlah),0) as totalPet"),
-                'd.locationName as location',
-                'a.locationId as locationId',
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0) = 0 then '' else
-                    (select ct.phoneNumber from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0 limit 1) END as phoneNumber"),
-
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.type='Whatsapp' and ct.usage='Utama' and ct.isDeleted=0) > 0 THEN true ELSE false END AS isWhatsapp"),
-
-                DB::raw("CASE WHEN (select count(*) from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0) = 0 THEN '' ELSE
-                    (select ce.email from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0 LIMIT 1) END AS emailAddress"),
-
-                // DB::raw("CONCAT(e.phoneNumber) as phoneNumber"),
-                // DB::raw("CASE WHEN lower(e.type)='whatshapp' then true else false end as isWhatsapp"),
-                //'f.email as emailAddress',
-                'u.firstName as createdBy',
-                DB::raw('a.created_at as createdAt'),
-                'a.updated_at'
-            )
-            ->where([
-                ['a.isDeleted', '=', '0']
-            ]);
-
-        if ($request->locationId) {
-
-            $val = [];
-            foreach ($request->locationId as $temp) {
-                $val = $temp;
-            }
-
-            if ($val) {
-                $data = $data->whereIn('a.locationid', $request->locationId);
-            }
-        }
-
-        $data = DB::table($data)
-            ->select(
-                'id',
-                'memberNo',
-                'customerName',
-                'totalPet',
-                'location',
-                'locationId',
-                'phoneNumber',
-                'isWhatsapp',
-                'emailAddress',
-                'createdBy',
-                'createdAt',
-                'updated_at'
-            );
-
-
-
-
-        if ($request->search) {
-
-            $data = $data->where('memberNo', 'like', '%' . $request->search . '%');
-        }
-
-        $data = $data->get();
-
-        if (count($data)) {
-            $temp_column = 'memberNo';
-            return $temp_column;
-        }
-
-        //total pet
-        $data = DB::table('customer as a')
-
-            ->leftjoin(
-                DB::raw('(
-					select count(id)as jumlah,customerId from `customerPets` where isDeleted=0
-					GROUP by customerId
-				) as b'),
-                function ($join) {
-                    $join->on('b.customerId', '=', 'a.id');
-                }
-            )
-            ->leftjoin('location as d', 'd.id', '=', 'a.locationId')
-            ->leftjoin('customerGroups as cg', 'cg.id', '=', 'a.customerGroupId')
-            ->join('users as u', 'a.createdBy', 'u.id')
-
-            ->select(
-                'a.id as id',
-                'a.memberNo',
-                DB::raw("IFNULL ((cg.customerGroup),'') as customerGroup"),
-                DB::raw("CONCAT(IFNULL(a.firstName,''), case when a.middleName is null then '' else ' ' end , IFNULL(a.middleName,'') ,case when a.lastName is null then '' else ' ' end, case when a.lastName is null then '' else a.lastName end ) as customerName"),
-                DB::raw("IFNULL ((b.jumlah),0) as totalPet"),
-                'd.locationName as location',
-                'a.locationId as locationId',
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0) = 0 then '' else
-                    (select ct.phoneNumber from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0 limit 1) END as phoneNumber"),
-
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.type='Whatsapp' and ct.usage='Utama' and ct.isDeleted=0) > 0 THEN true ELSE false END AS isWhatsapp"),
-
-                DB::raw("CASE WHEN (select count(*) from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0) = 0 THEN '' ELSE
-                    (select ce.email from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0 LIMIT 1) END AS emailAddress"),
-
-                // DB::raw("CONCAT(e.phoneNumber) as phoneNumber"),
-                // DB::raw("CASE WHEN lower(e.type)='whatshapp' then true else false end as isWhatsapp"),
-                //'f.email as emailAddress',
-                'u.firstName as createdBy',
-                DB::raw('a.created_at as createdAt'),
-                'a.updated_at'
-            )
-            ->where([
-                ['a.isDeleted', '=', '0'],
-            ]);
-
-
-        if ($request->locationId) {
-
-            $val = [];
-            foreach ($request->locationId as $temp) {
-                $val = $temp;
-            }
-
-            if ($val) {
-                $data = $data->whereIn('a.locationid', $request->locationId);
-            }
-        }
-
-
-        $data = DB::table($data)
-            ->select(
-                'id',
-                'memberNo',
-                'customerName',
-                'totalPet',
-                'location',
-                'locationId',
-                'phoneNumber',
-                'isWhatsapp',
-                'emailAddress',
-                'createdBy',
-                'createdAt',
-                'updated_at'
-            );
-
-
-
-
-
-        if ($request->search) {
-            $data = $data->where('totalPet', 'like', '%' . $request->search . '%');
-        }
-
-        $data = $data->get();
-
-        if (count($data)) {
-            $temp_column = 'totalPet';
-            return $temp_column;
-        }
-
-
-        //location
-        $data = DB::table('customer as a')
-
-            ->leftjoin(
-                DB::raw('(
-					select count(id)as jumlah,customerId from `customerPets` where isDeleted=0
-					GROUP by customerId
-				) as b'),
-                function ($join) {
-                    $join->on('b.customerId', '=', 'a.id');
-                }
-            )
-            ->leftjoin('location as d', 'd.id', '=', 'a.locationId')
-            ->leftjoin('customerGroups as cg', 'cg.id', '=', 'a.customerGroupId')
-            ->join('users as u', 'a.createdBy', 'u.id')
-
-            ->select(
-                'a.id as id',
-                'a.memberNo',
-                DB::raw("IFNULL ((cg.customerGroup),'') as customerGroup"),
-                DB::raw("CONCAT(IFNULL(a.firstName,''), case when a.middleName is null then '' else ' ' end , IFNULL(a.middleName,'') ,case when a.lastName is null then '' else ' ' end, case when a.lastName is null then '' else a.lastName end ) as customerName"),
-                DB::raw("IFNULL ((b.jumlah),0) as totalPet"),
-                'd.locationName as location',
-                'a.locationId as locationId',
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0) = 0 then '' else
-                    (select ct.phoneNumber from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0 limit 1) END as phoneNumber"),
-
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.type='Whatsapp' and ct.usage='Utama' and ct.isDeleted=0) > 0 THEN true ELSE false END AS isWhatsapp"),
-
-                DB::raw("CASE WHEN (select count(*) from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0) = 0 THEN '' ELSE
-                    (select ce.email from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0 LIMIT 1) END AS emailAddress"),
-
-                // DB::raw("CONCAT(e.phoneNumber) as phoneNumber"),
-                // DB::raw("CASE WHEN lower(e.type)='whatshapp' then true else false end as isWhatsapp"),
-                //'f.email as emailAddress',
-                'u.firstName as createdBy',
-                DB::raw('a.created_at as createdAt'),
-                'a.updated_at'
-            )
-            ->where([
-                ['a.isDeleted', '=', '0'],
-            ]);
-
-
-        if ($request->locationId) {
-
-            $val = [];
-            foreach ($request->locationId as $temp) {
-                $val = $temp;
-            }
-
-            if ($val) {
-                $data = $data->whereIn('a.locationid', $request->locationId);
-            }
-        }
-
-        $data = DB::table($data)
-            ->select(
-                'id',
-                'memberNo',
-                'customerName',
-                'totalPet',
-                'location',
-                'locationId',
-                'phoneNumber',
-                'isWhatsapp',
-                'emailAddress',
-                'createdBy',
-                'createdAt',
-                'updated_at'
-            );
-
-        if ($request->search) {
-            $data = $data->where('location', 'like', '%' . $request->search . '%');
-        }
-
-        $data = $data->get();
-
-        if (count($data)) {
-            $temp_column = 'location';
-            return $temp_column;
-        }
-
-
-
-
-        $data = DB::table('customer as a')
-
-            ->leftjoin(
-                DB::raw('(
-					select count(id)as jumlah,customerId from `customerPets` where isDeleted=0
-					GROUP by customerId
-				) as b'),
-                function ($join) {
-                    $join->on('b.customerId', '=', 'a.id');
-                }
-            )
-            ->leftjoin('location as d', 'd.id', '=', 'a.locationId')
-            ->leftjoin('customerGroups as cg', 'cg.id', '=', 'a.customerGroupId')
-            ->join('users as u', 'a.createdBy', 'u.id')
-
-            ->select(
-                'a.id as id',
-                'a.memberNo',
-                DB::raw("IFNULL ((cg.customerGroup),'') as customerGroup"),
-                DB::raw("CONCAT(IFNULL(a.firstName,''), case when a.middleName is null then '' else ' ' end , IFNULL(a.middleName,'') ,case when a.lastName is null then '' else ' ' end, case when a.lastName is null then '' else a.lastName end ) as customerName"),
-                DB::raw("IFNULL ((b.jumlah),0) as totalPet"),
-                'd.locationName as location',
-                'a.locationId as locationId',
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0) = 0 then '' else
-                    (select ct.phoneNumber from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0 limit 1) END as phoneNumber"),
-
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.type='Whatsapp' and ct.usage='Utama' and ct.isDeleted=0) > 0 THEN true ELSE false END AS isWhatsapp"),
-
-                DB::raw("CASE WHEN (select count(*) from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0) = 0 THEN '' ELSE
-                    (select ce.email from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0 LIMIT 1) END AS emailAddress"),
-
-                // DB::raw("CONCAT(e.phoneNumber) as phoneNumber"),
-                // DB::raw("CASE WHEN lower(e.type)='whatshapp' then true else false end as isWhatsapp"),
-                //'f.email as emailAddress',
-                'u.firstName as createdBy',
-                DB::raw('a.created_at as createdAt'),
-                'a.updated_at'
-            )
-            ->where([
-                ['a.isDeleted', '=', '0']
-            ]);
-
-
-        if ($request->locationId) {
-
-            $val = [];
-            foreach ($request->locationId as $temp) {
-                $val = $temp;
-            }
-
-            if ($val) {
-                $data = $data->whereIn('a.locationid', $request->locationId);
-            }
-        }
-
-
-        $data = DB::table($data)
-            ->select(
-                'id',
-                'memberNo',
-                'customerName',
-                'totalPet',
-                'location',
-                'locationId',
-                'phoneNumber',
-                'isWhatsapp',
-                'emailAddress',
-                'createdBy',
-                'createdAt',
-                'updated_at'
-            );
-
-        if ($request->search) {
-            $data = $data->where('phoneNumber', 'like', '%' . $request->search . '%');
-        }
-
-        $data = $data->get();
-
-        if (count($data)) {
-            $temp_column = 'phoneNumber';
-            return $temp_column;
-        }
-
-
-
-        $data = DB::table('customer as a')
-
-            ->leftjoin(
-                DB::raw('(
-					select count(id)as jumlah,customerId from `customerPets` where isDeleted=0
-					GROUP by customerId
-				) as b'),
-                function ($join) {
-                    $join->on('b.customerId', '=', 'a.id');
-                }
-            )
-            ->leftjoin('location as d', 'd.id', '=', 'a.locationId')
-            ->leftjoin('customerGroups as cg', 'cg.id', '=', 'a.customerGroupId')
-            ->join('users as u', 'a.createdBy', 'u.id')
-
-            ->select(
-                'a.id as id',
-                'a.memberNo',
-                DB::raw("IFNULL ((cg.customerGroup),'') as customerGroup"),
-                DB::raw("CONCAT(IFNULL(a.firstName,''), case when a.middleName is null then '' else ' ' end , IFNULL(a.middleName,'') ,case when a.lastName is null then '' else ' ' end, case when a.lastName is null then '' else a.lastName end ) as customerName"),
-                DB::raw("IFNULL ((b.jumlah),0) as totalPet"),
-                'd.locationName as location',
-                'a.locationId as locationId',
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0) = 0 then '' else
-                    (select ct.phoneNumber from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0 limit 1) END as phoneNumber"),
-
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.type='Whatsapp' and ct.usage='Utama' and ct.isDeleted=0) > 0 THEN true ELSE false END AS isWhatsapp"),
-
-                DB::raw("CASE WHEN (select count(*) from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0) = 0 THEN '' ELSE
-                    (select ce.email from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0 LIMIT 1) END AS emailAddress"),
-
-                // DB::raw("CONCAT(e.phoneNumber) as phoneNumber"),
-                // DB::raw("CASE WHEN lower(e.type)='whatshapp' then true else false end as isWhatsapp"),
-                //'f.email as emailAddress',
-                'u.firstName as createdBy',
-                DB::raw('a.created_at as createdAt'),
-                'a.updated_at'
-            )
-            ->where([
-                ['a.isDeleted', '=', '0']
-            ]);
-
-        if ($request->locationId) {
-
-            $val = [];
-            foreach ($request->locationId as $temp) {
-                $val = $temp;
-            }
-
-            if ($val) {
-                $data = $data->whereIn('a.locationid', $request->locationId);
-            }
-        }
-
-        $data = DB::table($data)
-            ->select(
-                'id',
-                'memberNo',
-                'customerName',
-                'totalPet',
-                'location',
-                'locationId',
-                'phoneNumber',
-                'isWhatsapp',
-                'emailAddress',
-                'createdBy',
-                'createdAt',
-                'updated_at'
-            );
-
-        if ($request->search) {
-            $data = $data->where('isWhatsapp', 'like', '%' . $request->search . '%');
-        }
-
-        $data = $data->get();
-
-        if (count($data)) {
-            $temp_column = 'isWhatsapp';
-            return $temp_column;
-        }
-
-
-        $data = DB::table('customer as a')
-
-            ->leftjoin(
-                DB::raw('(
-					select count(id)as jumlah,customerId from `customerPets` where isDeleted=0
-					GROUP by customerId
-				) as b'),
-                function ($join) {
-                    $join->on('b.customerId', '=', 'a.id');
-                }
-            )
-            ->leftjoin('location as d', 'd.id', '=', 'a.locationId')
-            ->leftjoin('customerGroups as cg', 'cg.id', '=', 'a.customerGroupId')
-            ->join('users as u', 'a.createdBy', 'u.id')
-
-            ->select(
-                'a.id as id',
-                'a.memberNo',
-                DB::raw("IFNULL ((cg.customerGroup),'') as customerGroup"),
-                DB::raw("CONCAT(IFNULL(a.firstName,''), case when a.middleName is null then '' else ' ' end , IFNULL(a.middleName,'') ,case when a.lastName is null then '' else ' ' end, case when a.lastName is null then '' else a.lastName end ) as customerName"),
-                DB::raw("IFNULL ((b.jumlah),0) as totalPet"),
-                'd.locationName as location',
-                'a.locationId as locationId',
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0) = 0 then '' else
-                    (select ct.phoneNumber from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0 limit 1) END as phoneNumber"),
-
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.type='Whatsapp' and ct.usage='Utama' and ct.isDeleted=0) > 0 THEN true ELSE false END AS isWhatsapp"),
-
-                DB::raw("CASE WHEN (select count(*) from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0) = 0 THEN '' ELSE
-                    (select ce.email from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0 LIMIT 1) END AS emailAddress"),
-
-                // DB::raw("CONCAT(e.phoneNumber) as phoneNumber"),
-                // DB::raw("CASE WHEN lower(e.type)='whatshapp' then true else false end as isWhatsapp"),
-                //'f.email as emailAddress',
-                'u.firstName as createdBy',
-                DB::raw('a.created_at as createdAt'),
-                'a.updated_at'
-            )
-            ->where([
-                ['a.isDeleted', '=', '0'],
-            ]);
-
-        if ($request->locationId) {
-
-            $val = [];
-            foreach ($request->locationId as $temp) {
-                $val = $temp;
-            }
-
-            if ($val) {
-                $data = $data->whereIn('a.locationid', $request->locationId);
-            }
-        }
-        $data = DB::table($data)
-            ->select(
-                'id',
-                'memberNo',
-                'customerName',
-                'totalPet',
-                'location',
-                'locationId',
-                'phoneNumber',
-                'isWhatsapp',
-                'emailAddress',
-                'createdBy',
-                'createdAt',
-                'updated_at'
-            );
-
-        if ($request->search) {
-            $data = $data->where('emailAddress', 'like', '%' . $request->search . '%');
-        }
-
-        $data = $data->get();
-
-        if (count($data)) {
-            $temp_column = 'emailAddress';
-            return $temp_column;
-        }
-
-
-        $data = DB::table('customer as a')
-
-            ->leftjoin(
-                DB::raw('(
-                select count(id)as jumlah,customerId from `customerPets` where isDeleted=0
-                GROUP by customerId
-            ) as b'),
-                function ($join) {
-                    $join->on('b.customerId', '=', 'a.id');
-                }
-            )
-            ->leftjoin('location as d', 'd.id', '=', 'a.locationId')
-            ->leftjoin('customerGroups as cg', 'cg.id', '=', 'a.customerGroupId')
-            ->join('users as u', 'a.createdBy', 'u.id')
-
-            ->select(
-                'a.id as id',
-                'a.memberNo',
-                DB::raw("IFNULL ((cg.customerGroup),'') as customerGroup"),
-                DB::raw("CONCAT(IFNULL(a.firstName,''), case when a.middleName is null then '' else ' ' end , IFNULL(a.middleName,'') ,case when a.lastName is null then '' else ' ' end, case when a.lastName is null then '' else a.lastName end ) as customerName"),
-                DB::raw("IFNULL ((b.jumlah),0) as totalPet"),
-                'd.locationName as location',
-                'a.locationId as locationId',
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0) = 0 then '' else
-                    (select ct.phoneNumber from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0 limit 1) END as phoneNumber"),
-
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.type='Whatsapp' and ct.usage='Utama' and ct.isDeleted=0) > 0 THEN true ELSE false END AS isWhatsapp"),
-
-                DB::raw("CASE WHEN (select count(*) from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0) = 0 THEN '' ELSE
-                    (select ce.email from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0 LIMIT 1) END AS emailAddress"),
-
-                // DB::raw("CONCAT(e.phoneNumber) as phoneNumber"),
-                // DB::raw("CASE WHEN lower(e.type)='whatshapp' then true else false end as isWhatsapp"),
-                //'f.email as emailAddress',
-                'u.firstName as createdBy',
-                DB::raw('a.created_at as createdAt'),
-                'a.updated_at'
-            )
-            ->where([
-                ['a.isDeleted', '=', '0'],
-            ]);
-
-        if ($request->locationId) {
-
-            $val = [];
-            foreach ($request->locationId as $temp) {
-                $val = $temp;
-            }
-
-            if ($val) {
-                $data = $data->whereIn('a.locationid', $request->locationId);
-            }
-        }
-
-        $data = DB::table($data)
-            ->select(
-                'id',
-                'memberNo',
-                'customerName',
-                'totalPet',
-                'location',
-                'locationId',
-                'phoneNumber',
-                'isWhatsapp',
-                'emailAddress',
-                'createdBy',
-                'createdAt',
-                'updated_at'
-            );
-
-        if ($request->search) {
-            $data = $data->where('createdBy', 'like', '%' . $request->search . '%');
-        }
-
-        $data = $data->get();
-
-        if (count($data)) {
-            $temp_column = 'createdBy';
-            return $temp_column;
-        }
-
-
-        $data = DB::table('customer as a')
-
-            ->leftjoin(
-                DB::raw('(
-					select count(id)as jumlah,customerId from `customerPets` where isDeleted=0
-					GROUP by customerId
-				) as b'),
-                function ($join) {
-                    $join->on('b.customerId', '=', 'a.id');
-                }
-            )
-            ->leftjoin('location as d', 'd.id', '=', 'a.locationId')
-            ->leftjoin('customerGroups as cg', 'cg.id', '=', 'a.customerGroupId')
-            ->join('users as u', 'a.createdBy', 'u.id')
-
-            ->select(
-                'a.id as id',
-                'a.memberNo',
-                DB::raw("IFNULL ((cg.customerGroup),'') as customerGroup"),
-                DB::raw("CONCAT(IFNULL(a.firstName,''), case when a.middleName is null then '' else ' ' end , IFNULL(a.middleName,'') ,case when a.lastName is null then '' else ' ' end, case when a.lastName is null then '' else a.lastName end ) as customerName"),
-                DB::raw("IFNULL ((b.jumlah),0) as totalPet"),
-                'd.locationName as location',
-                'a.locationId as locationId',
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0) = 0 then '' else
-                    (select ct.phoneNumber from customerTelephones ct where ct.customerId=a.id and ct.usage='Utama' and ct.isDeleted=0 limit 1) END as phoneNumber"),
-
-                DB::raw("CASE WHEN (select count(*) from customerTelephones ct where ct.customerId=a.id and ct.type='Whatsapp' and ct.usage='Utama' and ct.isDeleted=0) > 0 THEN true ELSE false END AS isWhatsapp"),
-
-                DB::raw("CASE WHEN (select count(*) from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0) = 0 THEN '' ELSE
-                    (select ce.email from customerEmails ce where ce.customerId=a.id and ce.usage='Utama' and ce.isDeleted=0 LIMIT 1) END AS emailAddress"),
-
-                // DB::raw("CONCAT(e.phoneNumber) as phoneNumber"),
-                // DB::raw("CASE WHEN lower(e.type)='whatshapp' then true else false end as isWhatsapp"),
-                //'f.email as emailAddress',
-                'u.firstName as createdBy',
-                DB::raw('a.created_at as createdAt'),
-                'a.updated_at'
-            )
-            ->where([
-                ['a.isDeleted', '=', '0'],
-            ]);
-
-        if ($request->locationId) {
-
-            $val = [];
-            foreach ($request->locationId as $temp) {
-                $val = $temp;
-            }
-
-            if ($val) {
-                $data = $data->whereIn('a.locationid', $request->locationId);
-            }
-        }
-
-        $data = DB::table($data)
-            ->select(
-                'id',
-                'customerName',
-                'totalPet',
-                'location',
-                'locationId',
-                'phoneNumber',
-                'isWhatsapp',
-                'emailAddress',
-                'createdBy',
-                'createdAt',
-                'updated_at'
-            );
-
-        if ($request->search) {
-            $data = $data->where('createdAt', 'like', '%' . $request->search . '%');
-        }
-
-        $data = $data->get();
-
-        if (count($data)) {
-            $temp_column = 'createdAt';
-            return $temp_column;
         }
 
         return 'empty';
     }
+
 
 
     public function createCustomer(Request $request)

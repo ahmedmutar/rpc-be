@@ -6,10 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\bookings;
 use Illuminate\Http\Request;
 use Validator;
-use App\Models\BookingsPetHotel;
-use App\Models\BookingsPetSalon;
-use App\Models\BookingsBreeding;
-use App\Models\BookingsPetClinic;
+use App\Models\bookingsPetHotel;
+use App\Models\bookingsPetSalon;
+use App\Models\bookingsBreeding;
+use App\Models\bookingsPetClinic;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -122,7 +122,7 @@ class BookingController extends Controller
         ]);
 
         if ($request->services === 'PetHotel') {
-            BookingsPetHotel::create([
+            bookingsPetHotel::create([
                 'bookingId' => $booking->id,
                 'socializationType' => $request->socializationType,
                 'emergencyContactName' => $request->emergencyContactName,
@@ -131,7 +131,7 @@ class BookingController extends Controller
                 'userId' => $request->user()->id,
             ]);
         } else if ($request->services === 'PetSalon') {
-            BookingsPetSalon::create([
+            bookingsPetSalon::create([
                 'bookingId' => $booking->id,
                 'furCondition' => $request->furCondition,
                 'skinSensitivity' => $request->skinSensitivity,
@@ -139,7 +139,7 @@ class BookingController extends Controller
                 'userId' => $request->user()->id,
             ]);
         } else if ($request->services === 'Breeding') {
-            BookingsBreeding::create([
+            bookingsBreeding::create([
                 'bookingId' => $booking->id,
                 'stambum' => $request->stambum,
                 'healthClearance' => $request->healthClearance,
@@ -147,7 +147,7 @@ class BookingController extends Controller
                 'userId' => $request->user()->id,
             ]);
         } else if ($request->services === 'PetClinic') {
-            BookingsPetClinic::create([
+            bookingsPetClinic::create([
                 'bookingId' => $booking->id,
                 'consultationType' => $request->consultationType,
                 'drugAllergy' => $request->drugAllergy,
@@ -167,7 +167,7 @@ class BookingController extends Controller
             'doctorId'  => 'required|integer',
             'customerId'  => 'required|integer',
             'petId'       => 'required|integer',
-            'services'    => 'required|in:PetHotel,PetSalon,Breeding,PetClinic',
+            'services'    => 'required|in:Pet Hotel,Pet Salon,Breeding,Pet Clinic',
             'bookingTime' => 'required|date',
         ];
 
@@ -176,13 +176,13 @@ class BookingController extends Controller
         $service = $data['services'] ?? null;
 
         $extraRules = match ($service) {
-            'PetHotel' => [
+            'Pet Hotel' => [
                 'socializationType'    => 'required|string',
                 'emergencyContactName' => 'required|string',
                 'inventoryProducts'    => 'required|string',
                 'additionalInfo'       => 'nullable|string',
             ],
-            'PetSalon' => [
+            'Pet Salon' => [
                 'furCondition'    => 'required|string',
                 'skinSensitivity' => 'required|string',
                 'additionalInfo'  => 'nullable|string',
@@ -192,7 +192,7 @@ class BookingController extends Controller
                 'healthClearance' => 'required|string',
                 'additionalInfo'  => 'nullable|string',
             ],
-            'PetClinic' => [
+            'Pet Clinic' => [
                 'consultationType' => 'required|string',
                 'drugAllergy'      => 'nullable|string',
                 'additionalInfo'   => 'nullable|string',
@@ -226,8 +226,8 @@ class BookingController extends Controller
             'userUpdateId' => $request->user()->id,
         ]);
 
-        if ($service === 'PetHotel') {
-            $bookingDetail = BookingsPetHotel::where('bookingId', $data['id'])->first();
+        if ($service === 'Pet Hotel') {
+            $bookingDetail = bookingsPetHotel::where('bookingId', $data['id'])->first();
             if ($bookingDetail) {
                 $bookingDetail->update([
                     'socializationType'    => $data['socializationType'],
@@ -237,8 +237,8 @@ class BookingController extends Controller
                     'userUpdateId'         => $request->user()->id,
                 ]);
             }
-        } elseif ($service === 'PetSalon') {
-            $bookingDetail = BookingsPetSalon::where('bookingId', $data['id'])->first();
+        } elseif ($service === 'Pet Salon') {
+            $bookingDetail = bookingsPetSalon::where('bookingId', $data['id'])->first();
             if ($bookingDetail) {
                 $bookingDetail->update([
                     'furCondition'    => $data['furCondition'],
@@ -248,7 +248,7 @@ class BookingController extends Controller
                 ]);
             }
         } elseif ($service === 'Breeding') {
-            $bookingDetail = BookingsBreeding::where('bookingId', $data['id'])->first();
+            $bookingDetail = bookingsBreeding::where('bookingId', $data['id'])->first();
             if ($bookingDetail) {
                 $bookingDetail->update([
                     'stambum'         => $data['stambum'],
@@ -257,8 +257,8 @@ class BookingController extends Controller
                     'userUpdateId'    => $request->user()->id,
                 ]);
             }
-        } elseif ($service === 'PetClinic') {
-            $bookingDetail = BookingsPetClinic::where('bookingId', $data['id'])->first();
+        } elseif ($service === 'Pet Clinic') {
+            $bookingDetail = bookingsPetClinic::where('bookingId', $data['id'])->first();
             if ($bookingDetail) {
                 $bookingDetail->update([
                     'consultationType' => $data['consultationType'],
@@ -286,7 +286,7 @@ class BookingController extends Controller
             ], 422);
         }
 
-        $booking = bookings::find($request->id)->where('isDeleted', false)->first();
+        $booking = bookings::where('id', $request->id)->where('isDeleted', false)->first();
         if (!$booking) {
             return response()->json([
                 'message' => 'Booking not found.',
