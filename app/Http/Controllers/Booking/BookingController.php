@@ -22,7 +22,7 @@ class BookingController extends Controller
             ->join('customer as c', 'e.customerId', 'c.id')
             ->join('customerPets as p', 'e.petId', 'p.id')
             ->join('location as l', 'e.locationId', 'l.id')
-            ->select(
+            ->select([
                 'e.id',
                 // Perbaikan: Menggunakan DB::raw dengan CONCAT agar title tergabung dengan benar
                 DB::raw("CONCAT(e.serviceType, ' - ', c.firstName, ' ', c.lastName, ' (', p.petName, ')') as title"),
@@ -30,20 +30,20 @@ class BookingController extends Controller
                 DB::raw("'' as `end`"), // Gunakan DB::raw untuk string kosong agar konsisten
                 DB::raw("0 as allDay"),
                 DB::raw("CASE e.serviceType
-                WHEN 'PetHotel' THEN '#FF0000'
-                WHEN 'PetSalon' THEN '#FFFF00'
+                WHEN 'Pet Hotel' THEN '#FF0000'
+                WHEN 'Pet Salon' THEN '#FFFF00'
                 WHEN 'Breeding' THEN '#008000'
-                WHEN 'PetClinic' THEN '#0000FF'
+                WHEN 'Pet Clinic' THEN '#0000FF'
                 ELSE '#CCCCCC' END as color"),
                 DB::raw("CASE e.serviceType
-                WHEN 'PetHotel' THEN '#000000'
-                WHEN 'PetSalon' THEN '#000000'
+                WHEN 'Pet Hotel' THEN '#000000'
+                WHEN 'Pet Salon' THEN '#000000'
                 WHEN 'Breeding' THEN '#FFFFFF'
-                WHEN 'PetClinic' THEN '#FFFFFF'
+                WHEN 'Pet Clinic' THEN '#FFFFFF'
                 ELSE '#000000' END as textColor"),
 
                 DB::raw("'' as description")
-            )
+            ])
             ->where('e.isDeleted', '=', 0);
 
         if ($request->filled('monthBooking') && $request->filled('yearBooking')) {
@@ -71,20 +71,20 @@ class BookingController extends Controller
             'doctorId'  => 'required|integer',
             'customerId'  => 'required|integer',
             'petId'       => 'required|integer',
-            'services'    => 'required|in:PetHotel,PetSalon,Breeding,PetClinic',
+            'services'    => 'required|in:Pet Hotel,Pet Salon,Breeding,Pet Clinic',
             'bookingTime' => 'required|date',
         ];
 
         $service = $request->input('services');
 
         $extraRules = match ($service) {
-            'PetHotel' => [
+            'Pet Hotel' => [
                 'socializationType'   => 'required|string',
                 'emergencyContactName'  => 'required|string',
                 'inventoryProducts'      => 'required|string',
                 'additionalInfo'   => 'nullable|string',
             ],
-            'PetSalon' => [
+            'Pet Salon' => [
                 'furCondition'  => 'required|string',
                 'skinSensitivity'      => 'required|string',
                 'additionalInfo'   => 'nullable|string',
@@ -94,7 +94,7 @@ class BookingController extends Controller
                 'healthClearance'     => 'required|string',
                 'additionalInfo'   => 'nullable|string',
             ],
-            'PetClinic' => [
+            'Pet Clinic' => [
                 'consultationType'     => 'required|string',
                 'drugAllergy'         => 'nullable|string',
                 'additionalInfo'   => 'nullable|string',
@@ -121,7 +121,7 @@ class BookingController extends Controller
             'userId' => $request->user()->id,
         ]);
 
-        if ($request->services === 'PetHotel') {
+        if ($request->services === 'Pet Hotel') {
             bookingsPetHotel::create([
                 'bookingId' => $booking->id,
                 'socializationType' => $request->socializationType,
@@ -130,7 +130,7 @@ class BookingController extends Controller
                 'additionalInfo' => $request->additionalInfo,
                 'userId' => $request->user()->id,
             ]);
-        } else if ($request->services === 'PetSalon') {
+        } else if ($request->services === 'Pet Salon') {
             bookingsPetSalon::create([
                 'bookingId' => $booking->id,
                 'furCondition' => $request->furCondition,
@@ -146,7 +146,7 @@ class BookingController extends Controller
                 'additionalInfo' => $request->additionalInfo,
                 'userId' => $request->user()->id,
             ]);
-        } else if ($request->services === 'PetClinic') {
+        } else if ($request->services === 'Pet Clinic') {
             bookingsPetClinic::create([
                 'bookingId' => $booking->id,
                 'consultationType' => $request->consultationType,
