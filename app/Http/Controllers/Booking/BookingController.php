@@ -159,6 +159,61 @@ class BookingController extends Controller
         return responseCreate();
     }
 
+    public function detail(Request $request)
+    {
+        $booking = DB::table('bookings as e')
+            ->join('users as u', 'e.userId', '=', 'u.id')
+            ->join('customer as c', 'e.customerId', '=', 'c.id')
+            ->join('customerPets as p', 'e.petId', '=', 'p.id')
+            ->join('location as l', 'e.locationId', '=', 'l.id')
+            ->leftJoin('users as d', 'e.doctorId', '=', 'd.id')
+            ->select([
+                'e.id',
+                'e.serviceType',
+                'e.bookingTime',
+                'e.isCancelled',
+                'e.cancellationReason',
+                'e.canceledByName',
+                'e.cancellationDate',
+                'c.id as customerId',
+                'c.firstName as customerFirstName',
+                'c.lastName as customerLastName',
+                DB::raw("CONCAT(c.firstName, ' ', c.lastName) as customerFullName"),
+                'p.id as petId',
+                'p.petName',
+                'l.id as locationId',
+                'l.locationName',
+                'd.id as doctorId',
+                DB::raw("CONCAT(d.firstName, ' ', d.lastName) as doctorName"),
+                'u.id as createdByUserId',
+                DB::raw("CONCAT(u.firstName, ' ', u.lastName) as createdByUserName"),
+            ])
+            ->where('e.id', $request->id)
+            ->where('e.isDeleted', 0)
+            ->first();
+
+        if (!$booking) {
+            return response()->json([
+                'message' => 'Booking not found.',
+            ], 404);
+        }
+
+        $detail = match ($booking->serviceType) {
+            'Pet Hotel'  => bookingsPetHotel::where('bookingId', $booking->id)->first(),
+            'Pet Salon'  => bookingsPetSalon::where('bookingId', $booking->id)->first(),
+            'Breeding'   => bookingsBreeding::where('bookingId', $booking->id)->first(),
+            'Pet Clinic' => bookingsPetClinic::where('bookingId', $booking->id)->first(),
+            default      => null,
+        };
+
+        return response()->json([
+            'data' => [
+                'booking' => $booking,
+                'detail'  => $detail,
+            ],
+        ]);
+    }
+
     public function update(Request $request)
     {
         $baseRules = [
