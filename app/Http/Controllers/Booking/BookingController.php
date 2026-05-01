@@ -25,7 +25,7 @@ class BookingController extends Controller
             ->select([
                 'e.id',
                 // Perbaikan: Menggunakan DB::raw dengan CONCAT agar title tergabung dengan benar
-                DB::raw("CONCAT(e.serviceType, ' - ', c.firstName, ' ', c.lastName, ' (', p.petName, ')') as title"),
+                DB::raw("CONCAT(e.serviceType, ' - ', CASE WHEN c.firstName IS NOT NULL AND c.lastName IS NOT NULL THEN CONCAT(c.firstName, ' ', c.lastName) WHEN c.firstName IS NOT NULL THEN c.firstName WHEN c.lastName IS NOT NULL THEN c.lastName ELSE '' END, ' (', COALESCE(p.petName, ''), ')') as title"),
                 'e.bookingTime as start',
                 DB::raw("'' as `end`"), // Gunakan DB::raw untuk string kosong agar konsisten
                 DB::raw("0 as allDay"),
