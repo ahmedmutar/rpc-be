@@ -144,6 +144,7 @@ Route::group(['middleware' => ['jwt.verify']], function () {
         Route::post('/', [BookingBookingController::class, 'create']);
         Route::put('/', [BookingBookingController::class, 'update']);
         Route::get('/', [BookingBookingController::class, 'index']);
+        Route::get('/detail', [BookingBookingController::class, 'detail']);
         Route::put('/cancel', [BookingBookingController::class, 'cancelBooking']);
         Route::delete('/', [BookingBookingController::class, 'delete']);
     });
