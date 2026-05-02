@@ -24,6 +24,8 @@ class bookings extends Model
         'cancellationReason',
         'canceledByName',
         'cancellationDate',
+        'realImageName',
+        'imagePath',
         'userId',
         'userUpdateId'
     ];

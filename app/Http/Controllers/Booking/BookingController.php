@@ -73,6 +73,7 @@ class BookingController extends Controller
             'petId'       => 'required|integer',
             'services'    => 'required|in:Pet Hotel,Pet Salon,Breeding,Pet Clinic',
             'bookingTime' => 'required|date',
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ];
 
         $service = $request->input('services');
@@ -111,6 +112,18 @@ class BookingController extends Controller
             ], 422);
         }
 
+        $hashedName = "";
+        $realName = "";
+
+        if ($request->hasFile('image')) {
+            $file = $request->file('image');
+
+            $realName = $file->getClientOriginalName();
+            $hashedName = $file->hashName();
+            // Simpan ke public/uploads
+            $file->move(public_path('BookingImages'), $hashedName);
+        }
+
         $booking = bookings::create([
             'locationId'  => $request->locationId,
             'doctorId'  => $request->doctorId,
@@ -118,6 +131,8 @@ class BookingController extends Controller
             'petId'       => $request->petId,
             'serviceType'    => $request->services,
             'bookingTime' => $request->bookingTime,
+            'realImageName' => $realName,
+            'imagePath' => '/BookingImages/' . $hashedName,
             'userId' => $request->user()->id,
         ]);
 
@@ -187,6 +202,8 @@ class BookingController extends Controller
                 DB::raw("CONCAT(d.firstName, ' ', d.lastName) as doctorName"),
                 'u.id as createdByUserId',
                 DB::raw("CONCAT(u.firstName, ' ', u.lastName) as createdByUserName"),
+                'e.realImageName',
+                'e.imagePath',
             ])
             ->where('e.id', $request->id)
             ->where('e.isDeleted', 0)
