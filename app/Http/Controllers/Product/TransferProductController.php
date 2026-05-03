@@ -264,7 +264,7 @@ class TransferProductController
                 } else {
                     $numberId = '#' . str_pad($cntNum + 1, 8, 0, STR_PAD_LEFT);
                 }
-            } elseif ($request->type = 'draft') {
+            } elseif ($request->type == 'draft') {
                 $numberId = 'draft';
             }
 
@@ -310,41 +310,6 @@ class TransferProductController
 
             foreach ($datas as $value) {
                 $checkAdminApproval = false;
-
-                // if ($value['productType'] == 'productSell') {
-
-
-                // } elseif ($value['productType'] == 'productClinic') {
-
-                //     $dataProductOr = DB::table('productClinics as ps')
-                //         ->join('productClinicLocations as psl', 'ps.id', 'psl.productClinicId')
-                //         ->select('ps.fullName', 'psl.diffStock')
-                //         ->where('psl.locationId', '=', $request->locationIdOrigin)
-                //         ->where('ps.id', '=', $value['productId'])
-                //         ->first();
-
-                //     if (!$dataProductOr) {
-                //         return responseInvalid(['Location Origin with Product Id is not exists in our data']);
-                //     }
-
-                //     $data = DB::table('productClinics as ps')
-                //         ->join('productClinicLocations as psl', 'ps.id', 'psl.productClinicId')
-                //         ->select('ps.*')
-                //         ->where('psl.locationId', '=', $request->locationIdDestination)
-                //         ->where('ps.fullName', 'like', '%' . $dataProductOr->fullName . '%')
-                //         ->first();
-
-                //     if (!$data) {
-                //         $productIdDestination = 0;
-                //     } else {
-                //         $productIdDestination = $data->id;
-                //     }
-
-                //     if ($dataProductOr->diffStock <= 0) {
-                //         $adminApprovalMaster = true;
-                //         $checkAdminApproval = true;
-                //     }
-                // }
 
                 $dataProductOr = DB::table('products as ps')
                     ->join('productLocations as psl', 'ps.id', 'psl.productId')
@@ -510,7 +475,7 @@ class TransferProductController
         return responseIndex(ceil($totalPaging), $data);
     }
 
-    private function search($request)
+    private function search(Request $request)
     {
         $temp_column = null;
 
@@ -704,7 +669,7 @@ class TransferProductController
                 } else {
                     $numberId = '#' . str_pad($cntNum + 1, 8, 0, STR_PAD_LEFT);
                 }
-            } elseif ($request->type = 'draft') {
+            } elseif ($request->type == 'draft') {
                 $numberId = 'draft';
             }
 
@@ -1066,13 +1031,6 @@ class TransferProductController
                         'DeletedAt' => Carbon::now()
                     ]
                 );
-                // DB::table('productTransferDetails')
-                //     ->where('productTransferId', '=', $va)
-                //     ->update([
-                //         'isDeleted' => true,
-                //         'DeletedBy' => $request->user()->id,
-                //         'DeletedAt' => Carbon::now()
-                //     ]);
             }
 
             recentActivity(
@@ -1133,26 +1091,8 @@ class TransferProductController
 
                 $detail = productTransferDetails::where('productTransferId', '=', $request->id)->get();
 
+                $datas = [];
                 foreach ($detail as $value) {
-                    // if ($value->productType == 'productSell') {
-
-                    // } elseif ($value->productType == 'productClinic') {
-                    //     $prd = DB::table('productClinics as ps')
-                    //         ->join('productTransferDetails as ptd', 'ps.id', 'ptd.productIdOrigin')
-                    //         ->select(
-                    //             'ptd.id',
-                    //             'ps.id as productId',
-                    //             'ps.fullName',
-                    //             DB::raw("TRIM(ptd.additionalCost)+0 as additionalCost"),
-                    //             'ptd.remark',
-                    //             'ptd.productType',
-                    //             'ptd.quantity',
-                    //         )
-                    //         ->where('ptd.id', '=', $value->id)
-                    //         ->where('ptd.isDeleted', '=', 0)
-                    //         ->first();
-                    // }
-
                     $prd = DB::table('products as ps')
                         ->join('productTransferDetails as ptd', 'ps.id', 'ptd.productIdOrigin')
                         ->select(
@@ -1190,8 +1130,8 @@ class TransferProductController
                             'images' => $images
                         );
                     }
-                    $data->detail = $datas;
                 }
+                $data->detail = $datas;
 
                 return responseList($data);
             } elseif ($request->type == 'receive') {
@@ -1220,25 +1160,9 @@ class TransferProductController
                     ->first();
 
                 $detail = productTransferDetails::where('productTransferId', '=', $request->id)->get();
+                $datas = [];
                 //tinggal gambarnya belom
                 foreach ($detail as $value) {
-                    // if ($value->productType == 'productSell') {
-
-                    // } elseif ($value->productType == 'productClinic') {
-                    //     $prd = DB::table('productClinics as ps')
-                    //         ->join('productTransferDetails as ptd', 'ps.id', 'ptd.productIdOrigin')
-                    //         ->select(
-                    //             'ptd.id',
-                    //             'ps.fullName',
-                    //             DB::raw("TRIM(ptd.additionalCost)+0 as additionalCost"),
-                    //             'ptd.remark',
-                    //             'ptd.productType',
-                    //             'ptd.quantity',
-                    //         )
-                    //         ->where('ptd.id', '=', $value->id)
-                    //         ->first();
-                    // }
-
                     $prd = DB::table('products as ps')
                         ->join('productTransferDetails as ptd', 'ps.id', 'ptd.productIdOrigin')
                         ->select(
@@ -1350,7 +1274,7 @@ class TransferProductController
         );
     }
 
-    private function validationApproval($request)
+    private function validationApproval(Request $request)
     {
         $role = role($request->user()->id);
 
