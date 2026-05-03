@@ -41,7 +41,6 @@ class StaffLeaveController extends Controller
 
     public function getAllStaffActive()
     {
-
         try {
 
             $getUser = User::select(
@@ -57,109 +56,66 @@ class StaffLeaveController extends Controller
         }
     }
 
-
-
     public function adjustBalance(Request $request)
     {
-
         if (!adminAccess($request->user()->id)) {
             return responseInvalid(['User Access not Authorize!']);
+        }
+
+        $validate = Validator::make($request->all(), [
+            'usersId' => 'required|integer',
+            'balanceTypeId' => 'required|integer',
+            'amount' => 'required|integer',
+        ]);
+
+        if ($validate->fails()) {
+            return responseInvalid($validate->errors()->all());
+        }
+
+        // 1. Mapping tipe balance ke nama kolom database
+        $columns = [
+            1 => 'annualLeaveAllowance',
+            2 => 'annualLeaveAllowanceRemaining',
+            3 => 'annualSickAllowance',
+            4 => 'annualSickAllowanceRemaining',
+        ];
+
+        // 2. Validasi list order / balance type
+        if (!isset($columns[$request->balanceTypeId])) {
+            return response()->json([
+                'message' => 'The given data was invalid.',
+                'errors' => 'Balance type id must same within the array',
+                'balanceTypeId' => array_keys($columns),
+            ]);
         }
 
         DB::beginTransaction();
 
         try {
+            // 3. Gunakan exists() karena lebih efisien dari first() jika hanya butuh validasi ada/tidaknya data
+            $userExists = User::where('id', $request->usersId)->where('isDeleted', '0')->exists();
 
-
-            $validate = Validator::make(
-                $request->all(),
-                [
-                    'usersId' => 'required|integer',
-                    'balanceTypeId' => 'required|integer',
-                    'amount' => 'required|integer',
-                ]
-            );
-
-            if ($validate->fails()) {
-                $errors = $validate->errors()->all();
-                return responseInvalid($errors);
-            }
-
-
-            $User =  User::where('id', '=', $request->usersId)->where('isDeleted', '=', '0')->first();
-
-            if ($User == null) {
-
+            if (!$userExists) {
+                DB::rollBack();
                 return response()->json([
                     'message' => 'Failed',
                     'errors' => 'User id not found, please try different id',
                 ], 422);
-
-                return responseInvalid(['User id not found, please try different id']);
+                // Menghapus dead code: return responseInvalid([...]) yang sebelumnya ada di bawah return json
             }
 
-
-            $listOrder = array(
-                1,
-                2,
-                3,
-                4
-            );
-
-            if (!in_array($request->balanceTypeId, $listOrder)) {
-
-                return response()->json([
-                    'message' =>  'The given data was invalid.',
-                    'errors' => 'Balance type id must same within the array',
-                    'balanceTypeId' => $listOrder,
+            // 4. Update langsung secara dinamis berdasarkan mapping
+            User::where('id', $request->usersId)
+                ->update([
+                    $columns[$request->balanceTypeId] => $request->amount,
                 ]);
-            }
-
-
-            if ($request->balanceTypeId == 1) {
-
-
-
-                User::where('id', '=', $request->usersId)
-                    ->update(
-                        [
-                            'annualLeaveAllowance' => $request->amount,
-                        ],
-                    );
-            } else if ($request->balanceTypeId == 2) {
-
-                User::where('id', '=', $request->usersId)
-                    ->update(
-                        [
-                            'annualLeaveAllowanceRemaining' => $request->amount,
-                        ],
-                    );
-            } else if ($request->balanceTypeId == 3) {
-
-                User::where('id', '=', $request->usersId)
-                    ->update(
-                        [
-                            'annualSickAllowance' => $request->amount,
-                        ],
-                    );
-            } else if ($request->balanceTypeId == 4) {
-
-                User::where('id', '=', $request->usersId)
-                    ->update(
-                        [
-                            'annualSickAllowanceRemaining' => $request->amount,
-                        ],
-                    );
-            }
 
             DB::commit();
 
             return responseUpdate();
-        } catch (Exception $e) {
-
+        } catch (\Exception $e) {
             DB::rollback();
-
-            return responseInvalid([$e]);
+            return responseInvalid([$e->getMessage()]);
         }
     }
 
@@ -427,6 +383,17 @@ class StaffLeaveController extends Controller
 
             if ($validate->fails()) {
                 return responseInvalid($validate->errors()->all());
+            }
+
+            $user = User::where('id', $request->usersId)->where('isDeleted', 0)->first();
+
+            $joinDate = Carbon::parse($user->joinDate);
+            $now = Carbon::now();
+
+            $yearsOfService = $joinDate->diffInYears($now);
+
+            if ($yearsOfService >= 1) {
+                return responseInvalid(['Cannot request leave, your join date more than 1 year']);
             }
 
             $validDays   = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
@@ -4304,9 +4271,6 @@ class StaffLeaveController extends Controller
                     return $temp_column;
                 }
 
-
-
-
                 $data = LeaveRequest::from('leaveRequest as a')
                     ->leftjoin('jobTitle as b', 'a.jobTitle', '=', 'b.id')
                     ->select(
@@ -4460,7 +4424,6 @@ class StaffLeaveController extends Controller
 
     public function getAllHolidaysDate(Request $request)
     {
-
         try {
 
             $valYear = null;

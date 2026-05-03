@@ -83,28 +83,8 @@ class StaffController extends Controller
                 ], 422);
             }
 
-            // $getTypeIDName = TypeId::where([
-            //     ['id', '=', $request->typeId],
-            //     ['isActive', '=', '1']
-            // ])->first();
-
-            // if (str_contains(strtolower($getTypeIDName->typeName), 'paspor') || str_contains(strtolower($getTypeIDName->typeName), 'passpor')) {
-
-            //     if ((is_numeric($request->identificationNumber))) {
-            //         return responseInvalid(["Identification number must be alpanumeric if identification type is passport!"]);
-            //     }
-            // } else {
-            //     if (!is_numeric($request->identificationNumber) && is_int((int)$request->identificationNumber)) {
-            //         return responseInvalid(["Identification number must be integer!"]);
-            //     }
-            // }
-
-            //$ResImageDatas = json_decode($request->imageIdentifications, true);
-
             $start = Carbon::parse($request->startDate);
             $end = Carbon::parse($request->endDate);
-
-
             $data_item = [];
 
             if ($request->detailAddress) {
@@ -473,6 +453,7 @@ class StaffController extends Controller
                     'jobTitleId' => $request->jobTitleId,
                     'startDate' =>  $start,
                     'endDate' => $end,
+                    'joinDate' => $start,
                     'registrationNo' => $request->registrationNo,
                     'designation' => $request->designation,
                     'annualSickAllowance' => $request->annualSickAllowance,
@@ -2552,6 +2533,7 @@ class StaffController extends Controller
                         'jobTitleId' => $src1[$i]['jabatan'],
                         'startDate' => $startDateFormatted,
                         'endDate' => $endDateFormatted,
+                        'joinDate' => $startDateFormatted,
                         'registrationNo' => trim($src1[$i]['nomor_registrasi']),
                         'designation' => trim($src1[$i]['penunjukkan']),
                         'annualSickAllowance' => $src1[$i]['tunjangan_sakit_tahunan'],
