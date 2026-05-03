@@ -574,6 +574,11 @@ class StaffLeaveController extends Controller
                 return responseInvalid(['Please input reason if status is reject']);
             }
 
+            $leave = LeaveRequest::where('id', $request->leaveRequestId)->first();
+            $user = User::where('id', $leave->usersId)->where('isDeleted', 0)->first();
+            if ($user->lineManagerId != $request->user()->id) {
+                return responseInvalid(['You are not authorized to approve or reject this leave request']);
+            }
 
             $leaveRequest = LeaveRequest::where('id', '=', $request->leaveRequestId)
                 ->where('status', '=', 'pending')
