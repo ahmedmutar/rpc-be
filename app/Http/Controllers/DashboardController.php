@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\bookings;
 use Illuminate\Http\Request;
 use DB;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
@@ -13,19 +15,38 @@ class DashboardController extends Controller
             return responseUnauthorize();
         }
 
+        $now = Carbon::now();
+
+        $startOfCurrentMonth = $now->copy()->startOfMonth();
+        $endOfCurrentMonth = $now->copy();
+
+        $startOfLastMonth = $now->copy()->subMonth()->startOfMonth();
+        $endOfLastMonthCompare = $now->copy()->subMonth();
+
+        $chartsBookingCategory = $this->chartsBookingCategory();
+
+        $reportingGroup = $this->reportingGroup();
+        $reportingGroup = collect($reportingGroup);
+
+        $bookings = $this->bookings($startOfCurrentMonth, $endOfCurrentMonth, $startOfLastMonth, $endOfLastMonthCompare);
+
+        $newCustomer = $this->newCustomer($startOfCurrentMonth, $endOfCurrentMonth, $startOfLastMonth, $endOfLastMonthCompare);
+
+        $rebookRate = $this->calculateRebookRateTrend($startOfCurrentMonth, $endOfCurrentMonth, $startOfLastMonth, $endOfLastMonthCompare);
+
         $data = [
             'chartsBookingCategory' => [
-                'labels' => ['Layanan Kesehatan Hewan', 'Pet Salon', 'Rawat Inap Zona', 'Penitipan Vet', 'Vaksinasi', 'Other'],
-                'series' => [44, 55, 13, 60, 70, 20],
+                'labels' => $chartsBookingCategory->pluck('serviceType')->toArray(),
+                'series' => $chartsBookingCategory->pluck('total')->toArray(),
             ],
             'chartsReportingGroup' => [
-                'labels' => ['VIP', 'Other', 'Komunitas'],
-                'series' => [44, 55, 13],
+                'labels' => $reportingGroup->pluck('group')->toArray(),
+                'series' => $reportingGroup->pluck('total')->toArray(),
             ],
             'bookings' => [
-                'percentage' => '75.35',
-                'total' => '100',
-                'isLoss' => 1
+                'percentage' => $bookings['percentageBookings'],
+                'total' => $bookings['bookings'],
+                'isLoss' => $bookings['isLoss']
             ],
             'totalSaleValue' => [
                 'percentage' => '27.5',
@@ -33,14 +54,14 @@ class DashboardController extends Controller
                 'isLoss' => 0
             ],
             'newCustomer' => [
-                'percentage' => '48.8',
-                'total' => '300',
-                'isLoss' => 0
+                'percentage' => $newCustomer['percentageNewCustomer'],
+                'total' => $newCustomer['newCustomer'],
+                'isLoss' => $newCustomer['isLoss']
             ],
             'rebookRate' => [
-                'percentage' => '22.5',
-                'total' => '200',
-                'isLoss' => 0
+                'percentage' => $rebookRate['percentage'],
+                'total' => $rebookRate['rebookCount'],
+                'isLoss' => $rebookRate['isLoss']
             ],
             'customerRetention' => [
                 'percentage' => '40',
@@ -55,6 +76,150 @@ class DashboardController extends Controller
         ];
 
         return response()->json($data);
+    }
+
+    private function calculateRebookRateTrend($startOfCurrentMonth, $endOfCurrentMonth, $startOfLastMonth, $endOfLastMonthCompare)
+    {
+        // 1. Hitung Rate Bulan Ini
+        $currentData = $this->getRebookMetrics($startOfCurrentMonth, $endOfCurrentMonth);
+        $currentRate = $currentData['rate']; // misal 22.5%
+
+        // 2. Hitung Rate Bulan Lalu
+        $prevData = $this->getRebookMetrics($startOfLastMonth, $endOfLastMonthCompare);
+        $prevRate = $prevData['rate']; // misal 18.3%
+
+        // 3. Hitung Persentase Kenaikan Tren (Relative Growth)
+        $trendPercentage = 0;
+        if ($prevRate > 0) {
+            $trendPercentage = (($currentRate - $prevRate) / $prevRate) * 100;
+        } elseif ($currentRate > 0) {
+            $trendPercentage = 100;
+        }
+
+        return [
+            'rebookCount' => $currentData['rebooked_count'], // Angka 200 di chart
+            'percentage' => round($trendPercentage, 1), // Angka 22.5% di label biru
+            'isLoss' => $currentRate >= $prevRate ? 0 : 1
+        ];
+    }
+
+    private function getRebookMetrics($startDate, $endDate)
+    {
+        $totalUnique = Bookings::whereBetween('created_at', [$startDate, $endDate])
+            ->distinct('customerId')
+            ->count('customerId');
+
+        $rebookedCount = Bookings::whereBetween('created_at', [$startDate, $endDate])
+            ->select('customerId')
+            ->groupBy('customerId')
+            ->havingRaw('COUNT(customerId) > 1')
+            ->get()
+            ->count();
+
+        return [
+            'rebooked_count' => $rebookedCount,
+            'rate' => $totalUnique > 0 ? ($rebookedCount / $totalUnique) * 100 : 0
+        ];
+    }
+
+    private function newCustomer($startOfCurrentMonth, $endOfCurrentMonth, $startOfLastMonth, $endOfLastMonthCompare)
+    {
+        // 1. Ambil data jumlah customer periode sekarang
+        $newCustomer = DB::table('customer')
+            ->whereBetween('created_at', [
+                $startOfCurrentMonth,
+                $endOfCurrentMonth
+            ])
+            ->count();
+
+        // 2. Ambil data jumlah customer periode sebelumnya
+        $prevNewCustomer = DB::table('customer')
+            ->whereBetween('created_at', [
+                $startOfLastMonth,
+                $endOfLastMonthCompare
+            ])
+            ->count();
+
+        // 3. Hitung Persentase Tren
+        $percentageNewCustomer = 0;
+        if ($prevNewCustomer > 0) {
+            $percentageNewCustomer = (($newCustomer - $prevNewCustomer) / $prevNewCustomer) * 100;
+        } elseif ($newCustomer > 0) {
+            $percentageNewCustomer = 100;
+        }
+
+        // Mengembalikan 3 value dalam bentuk array asosiatif
+        return [
+            'newCustomer' => $newCustomer,
+            'percentageNewCustomer' => round($percentageNewCustomer, 2), // Dibulatkan agar rapi di UI
+            'isLoss' => $newCustomer >= $prevNewCustomer ? 0 : 1
+        ];
+    }
+
+    private function reportingGroup()
+    {
+        return DB::query()
+            ->from(function ($query) {
+                $query->select('customerId')->from('transactionPetClinics')
+                    ->unionAll(function ($q) {
+                        $q->select('customerId')->from('transaction_pet_hotels');
+                    })
+                    ->unionAll(function ($q) {
+                        $q->select('customerId')->from('transaction_breedings');
+                    })
+                    ->unionAll(function ($q) {
+                        $q->select('customerId')->from('transaction_pet_salons');
+                    });
+            }, 'transactions')
+            ->join('customer as b', 'transactions.customerId', 'b.id')
+            ->leftJoin('customerGroups as c', 'b.customerGroupId', 'c.id')
+            ->select(
+                DB::raw("COALESCE(c.customerGroup, 'Uncategorized') as `group`"),
+                DB::raw('COUNT(*) as total')
+            )
+            ->groupBy('group')
+            ->get();
+    }
+
+    private function chartsBookingCategory()
+    {
+        return DB::table('bookings')
+            ->select(
+                'serviceType',
+                DB::raw('COUNT(*) as total')
+            )
+            ->groupBy('serviceType')
+            ->get();
+    }
+
+    private function bookings($startOfCurrentMonth, $endOfCurrentMonth, $startOfLastMonth, $endOfLastMonthCompare)
+    {
+        // 1. Ambil data jumlah booking periode sekarang
+        $bookings = Bookings::whereBetween('created_at', [
+            $startOfCurrentMonth,
+            $endOfCurrentMonth
+        ])->count();
+
+        // 2. Ambil data jumlah booking periode sebelumnya
+        $prevBookings = Bookings::whereBetween('created_at', [
+            $startOfLastMonth,
+            $endOfLastMonthCompare
+        ])->count();
+
+        // 3. Hitung Persentase Tren
+        $percentageBookings = 0;
+        if ($prevBookings > 0) {
+            $percentageBookings = (($bookings - $prevBookings) / $prevBookings) * 100;
+        } elseif ($bookings > 0) {
+            $percentageBookings = 100;
+        }
+
+        // Mengembalikan 3 value dalam bentuk array asosiatif
+        return [
+            'bookings' => $bookings,
+            'percentageBookings' => round($percentageBookings, 2), // Dibulatkan agar rapi di UI
+            'isLoss' => $bookings >= $prevBookings ? 1 : 0
+        ];
     }
 
     public function upcomingBookInpatien(Request $request)
