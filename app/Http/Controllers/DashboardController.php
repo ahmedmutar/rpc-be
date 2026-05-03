@@ -37,15 +37,15 @@ class DashboardController extends Controller
         $data = [
             'chartsBookingCategory' => [
                 'labels' => $chartsBookingCategory->pluck('serviceType')->toArray(),
-                'series' => $chartsBookingCategory->pluck('total')->toArray(),
+                'series' => $chartsBookingCategory->pluck('total')->map(fn($value) => (int) $value)->toArray(),
             ],
             'chartsReportingGroup' => [
                 'labels' => $reportingGroup->pluck('group')->toArray(),
-                'series' => $reportingGroup->pluck('total')->toArray(),
+                'series' => $reportingGroup->pluck('total')->map(fn($value) => (int) $value)->toArray(),
             ],
             'bookings' => [
-                'percentage' => $bookings['percentageBookings'],
-                'total' => $bookings['bookings'],
+                'percentage' => (string) $bookings['percentageBookings'],
+                'total' => (string) $bookings['bookings'],
                 'isLoss' => $bookings['isLoss']
             ],
             'totalSaleValue' => [
@@ -54,13 +54,13 @@ class DashboardController extends Controller
                 'isLoss' => 0
             ],
             'newCustomer' => [
-                'percentage' => $newCustomer['percentageNewCustomer'],
-                'total' => $newCustomer['newCustomer'],
+                'percentage' => (string) $newCustomer['percentageNewCustomer'],
+                'total' => (string) $newCustomer['newCustomer'],
                 'isLoss' => $newCustomer['isLoss']
             ],
             'rebookRate' => [
-                'percentage' => $rebookRate['percentage'],
-                'total' => $rebookRate['rebookCount'],
+                'percentage' => (string) $rebookRate['percentage'],
+                'total' => (string) $rebookRate['rebookCount'],
                 'isLoss' => $rebookRate['isLoss']
             ],
             'customerRetention' => [
@@ -97,8 +97,8 @@ class DashboardController extends Controller
         }
 
         return [
-            'rebookCount' => $currentData['rebooked_count'], // Angka 200 di chart
-            'percentage' => round($trendPercentage, 1), // Angka 22.5% di label biru
+            'rebookCount' => (string) $currentData['rebooked_count'], // Angka 200 di chart
+            'percentage' => (string) round($trendPercentage, 1), // Angka 22.5% di label biru
             'isLoss' => $currentRate >= $prevRate ? 0 : 1
         ];
     }
@@ -150,8 +150,8 @@ class DashboardController extends Controller
 
         // Mengembalikan 3 value dalam bentuk array asosiatif
         return [
-            'newCustomer' => $newCustomer,
-            'percentageNewCustomer' => round($percentageNewCustomer, 2), // Dibulatkan agar rapi di UI
+            'newCustomer' =>(string) $newCustomer,
+            'percentageNewCustomer' =>(string) round($percentageNewCustomer, 2), // Dibulatkan agar rapi di UI
             'isLoss' => $newCustomer >= $prevNewCustomer ? 0 : 1
         ];
     }
@@ -216,9 +216,9 @@ class DashboardController extends Controller
 
         // Mengembalikan 3 value dalam bentuk array asosiatif
         return [
-            'bookings' => $bookings,
-            'percentageBookings' => round($percentageBookings, 2), // Dibulatkan agar rapi di UI
-            'isLoss' => $bookings >= $prevBookings ? 1 : 0
+            'bookings' =>(string) $bookings,
+            'percentageBookings' =>(string) round($percentageBookings, 2), // Dibulatkan agar rapi di UI
+            'isLoss' => $bookings >= $prevBookings ? 0 : 1
         ];
     }
 
